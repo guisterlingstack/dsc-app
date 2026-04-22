@@ -35,7 +35,7 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
-    try { await signIn(email, password); navigate('/'); }
+    try { await signIn(email, password); navigate('/Dashboard'); }
     catch (err) { setError(err.message || 'Email ou senha incorretos.'); }
     finally { setLoading(false); }
   };
@@ -45,7 +45,7 @@ export default function Login() {
     if (password !== confirm) { setError('As senhas não coincidem.'); return; }
     if (password.length < 6) { setError('A senha precisa ter pelo menos 6 caracteres.'); return; }
     setLoading(true);
-    try { await signUp(email, password, fullName); navigate('/'); }
+    try { await signUp(email, password, fullName); navigate('/Dashboard'); }
     catch (err) { setError(err.message || 'Erro ao criar conta. Tente novamente.'); }
     finally { setLoading(false); }
   };
