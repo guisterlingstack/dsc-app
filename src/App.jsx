@@ -175,8 +175,7 @@ function App() {
             {/* Rotas públicas */}
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
-
-            
+            <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/*" element={<AuthenticatedApp />} />
           </Routes>
         </Router>
