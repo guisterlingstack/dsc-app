@@ -18,14 +18,21 @@
 
     <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-
-    <!-- Favicon -->
     <link rel="icon" type="image/png" href="/icons/icon-96x96.png" />
 
-    <!-- Splash screen iOS -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-R2FQDKS2P4"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-R2FQDKS2P4', {
+        page_title: document.title,
+        send_page_view: true,
+        cookie_flags: 'SameSite=None;Secure'
+      });
+      window.gtag = gtag;
+    </script>
 
     <style>
       body { margin: 0; background-color: #000000; }
