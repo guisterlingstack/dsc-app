@@ -28,7 +28,7 @@ export const PAGES = {
   BankSetup,
   BudgetCalculator,
   CalendarioAdmin,
-  CalendarioClientes,
+  CalendarioCliente,
   Dashboard,
   IncomeAccelerator,
   LeakageDetector,
