@@ -84,17 +84,34 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const signUp = async (email, password, fullName) => {
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(), password,
-      options: { data: { full_name: fullName } },
-    });
-    if (error) throw error;
-    await supabase.from('clientes_autorizados')
-      .update({ usuario_criado: true })
-      .eq('email', email.trim().toLowerCase());
-    return data;
-  };
+ const signUp = async (email, password, fullName) => {
+  // Verifica se email está na lista de clientes autorizados
+  const { data: autorizado } = await supabase
+    .from('clientes_autorizados')
+    .select('email, usuario_criado')
+    .eq('email', email.trim().toLowerCase())
+    .maybeSingle();
+
+  if (!autorizado) {
+    throw new Error('Este e-mail não está autorizado. Adquira o acesso em nossa página de vendas.');
+  }
+
+  if (autorizado.usuario_criado) {
+    throw new Error('Este e-mail já possui uma conta. Faça login.');
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(), password,
+    options: { data: { full_name: fullName } },
+  });
+  if (error) throw error;
+
+  await supabase.from('clientes_autorizados')
+    .update({ usuario_criado: true })
+    .eq('email', email.trim().toLowerCase());
+
+  return data;
+};
 
   const signOut = async () => {
     await supabase.auth.signOut();
