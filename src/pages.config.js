@@ -1,3 +1,5 @@
+import CalendarioCliente   from './pages/CalendarioCliente';
+import CalendarioAdmin     from './pages/CalendarioAdmin';
 import AccelerationPlan    from './pages/AccelerationPlan';
 import AdminDashboard      from './pages/AdminDashboard';
 import AdminUsers          from './pages/AdminUsers';
@@ -25,6 +27,8 @@ export const PAGES = {
   AdminOnboarding,
   BankSetup,
   BudgetCalculator,
+  CalendarioAdmin,
+  CalendarioClientes,
   Dashboard,
   IncomeAccelerator,
   LeakageDetector,

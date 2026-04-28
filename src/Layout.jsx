@@ -22,12 +22,14 @@ const MENU_CLIENTE = [
   { label: 'Usar a Reserva?',    icon: PiggyBank,        path: 'ReserveUsage' },
   { label: 'Plano de Aceleração', icon: Zap,             path: 'AccelerationPlan' },
   { label: 'Configurações',      icon: Settings,         path: 'UserSettings' },
+  { label: 'Calendário',         icon: Calendar,         path: 'CalendarioCliente' },
 ];
 
 const MENU_ADMIN = [
   { label: 'Gestão de Usuários', icon: Users,         path: 'AdminUsers' },
   { label: 'Analytics',          icon: BarChart2,      path: 'AdminAnalytics' },
   { label: 'Onboarding',         icon: ClipboardList,  path: 'AdminOnboarding' },
+  { label: 'Calendário Admin',   icon: Calendar,      path: 'CalendarioAdmin' },
 ];
 
 export default function Layout({ children }) {
