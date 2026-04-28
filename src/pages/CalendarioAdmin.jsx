@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Calendar, Users, BarChart2, Settings, Inbox, Clock, MapPin, Check, X, Edit2, Trash2, Phone, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { connectGoogle, isGoogleConnected, handleGoogleCallback, criarEventoGoogle, cancelarEventoGoogle } from '@/lib/googleCalendar';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 const STATUS_LABEL = { agendado: 'Agendado', confirmado: 'Confirmado', realizado: 'Realizado', cancelado: 'Cancelado', reagendado: 'Reagendado' };
@@ -15,12 +16,11 @@ const DURACOES = [15, 30, 45, 60, 75, 90, 105, 120];
 function formatDataHora(d) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 function formatHora(h) { return typeof h === 'string' ? h.slice(0, 5) : ''; }
 
-// ── Gera todos os horários 07:00–22:30 ────────────────────
 function gerarHorarios() {
   const slots = [];
   for (let h = 7; h <= 22; h++) {
     slots.push(`${String(h).padStart(2, '0')}:00`);
-    if (h < 22 || true) slots.push(`${String(h).padStart(2, '0')}:30`);
+    slots.push(`${String(h).padStart(2, '0')}:30`);
   }
   return slots.filter(s => s <= '22:30');
 }
@@ -32,17 +32,28 @@ export default function CalendarioAdmin() {
   const [aba, setAba] = useState('reunioes');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroEvento, setFiltroEvento] = useState('');
-  const [modalEvento, setModalEvento] = useState(null); // null | 'novo' | objeto
+  const [modalEvento, setModalEvento] = useState(null);
   const [formEvento, setFormEvento] = useState({ nome: '', duracao_min: 60, local_tipo: 'zoom', local_link: '', limite_dia: 3, visivel: true, permite_interesse: false });
+  const [googleConectado, setGoogleConectado] = useState(isGoogleConnected());
+
+  // Processa callback OAuth Google
+  useEffect(() => {
+    if (window.location.hash.includes('access_token')) {
+      const ok = handleGoogleCallback();
+      if (ok) {
+        setGoogleConectado(true);
+        toast.success('Google Agenda conectado!');
+      }
+    }
+  }, []);
 
   if (!['admin', 'admin_master'].includes(user?.role)) return null;
 
-  // ── Queries ────────────────────────────────────────────────
   const { data: agendamentos = [] } = useQuery({
     queryKey: ['cal-admin-ag', filtroStatus, filtroEvento],
     queryFn: async () => {
       let q = supabase.from('calendario_agendamentos')
-        .select('*, calendario_eventos(nome), calendario_contatos!inner(nome, whatsapp)')
+        .select('*, calendario_eventos(nome), calendario_contatos(nome, whatsapp)')
         .order('data_hora', { ascending: true });
       if (filtroStatus) q = q.eq('status', filtroStatus);
       if (filtroEvento) q = q.eq('evento_id', filtroEvento);
@@ -83,15 +94,13 @@ export default function CalendarioAdmin() {
     },
   });
 
-  // ── Estatísticas ───────────────────────────────────────────
   const stats = {
-    total: agendamentos.length,
+    total:      agendamentos.length,
     concluidos: agendamentos.filter(a => a.status === 'realizado').length,
     cancelados: agendamentos.filter(a => a.status === 'cancelado').length,
     reagendados: agendamentos.filter(a => a.status === 'reagendado').length,
   };
 
-  // Top dias
   const contagemDias = {};
   agendamentos.forEach(a => {
     const d = new Date(a.data_hora).getDay();
@@ -99,7 +108,6 @@ export default function CalendarioAdmin() {
   });
   const topDias = Object.entries(contagemDias).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([d, c]) => ({ dia: DIAS_SEMANA[d], count: c }));
 
-  // Top horários
   const contagemHoras = {};
   agendamentos.forEach(a => {
     const h = new Date(a.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -107,12 +115,10 @@ export default function CalendarioAdmin() {
   });
   const topHoras = Object.entries(contagemHoras).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([h, c]) => ({ hora: h, count: c }));
 
-  // Próximos e anteriores
   const agora = new Date();
-  const proximos = agendamentos.filter(a => new Date(a.data_hora) >= agora && a.status !== 'cancelado');
+  const proximos  = agendamentos.filter(a => new Date(a.data_hora) >= agora && a.status !== 'cancelado');
   const anteriores = agendamentos.filter(a => new Date(a.data_hora) < agora || a.status === 'cancelado');
 
-  // ── Mutations ──────────────────────────────────────────────
   const toggleDisp = useMutation({
     mutationFn: async ({ dia_semana, horario, ativo }) => {
       if (ativo) {
@@ -143,15 +149,42 @@ export default function CalendarioAdmin() {
   });
 
   const excluirEvento = useMutation({
-    mutationFn: async (id) => {
-      await supabase.from('calendario_eventos').delete().eq('id', id);
-    },
+    mutationFn: async (id) => { await supabase.from('calendario_eventos').delete().eq('id', id); },
     onSuccess: () => { toast.success('Evento excluído'); qc.invalidateQueries(['cal-admin-eventos']); },
   });
 
   const atualizarStatus = useMutation({
-    mutationFn: async ({ id, status }) => {
-      await supabase.from('calendario_agendamentos').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+    mutationFn: async ({ id, status, ag }) => {
+      await supabase.from('calendario_agendamentos')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      // Cria evento no Google Agenda ao confirmar
+      if (status === 'confirmado' && googleConectado && ag) {
+        try {
+          const nomeCliente = ag.calendario_contatos?.nome || 'Cliente';
+          const nomeEvento  = ag.calendario_eventos?.nome  || 'Consultoria';
+          const googleId = await criarEventoGoogle({
+            titulo:     `${nomeEvento} — ${nomeCliente}`,
+            dataHora:   ag.data_hora,
+            duracaoMin: ag.duracao_min,
+            localLink:  ag.local_link,
+            descricao:  `WhatsApp: ${ag.calendario_contatos?.whatsapp || ''}`,
+          });
+          if (googleId) {
+            await supabase.from('calendario_agendamentos')
+              .update({ google_event_id: googleId })
+              .eq('id', id);
+          }
+        } catch (err) {
+          toast.error('Atualizado, mas erro no Google: ' + err.message);
+        }
+      }
+
+      // Cancela no Google se cancelado
+      if (status === 'cancelado' && ag?.google_event_id) {
+        try { await cancelarEventoGoogle(ag.google_event_id); } catch {}
+      }
     },
     onSuccess: () => qc.invalidateQueries(['cal-admin-ag']),
     onError: () => toast.error('Erro ao atualizar status'),
@@ -165,9 +198,7 @@ export default function CalendarioAdmin() {
   });
 
   const excluirContato = useMutation({
-    mutationFn: async (id) => {
-      await supabase.from('calendario_contatos').delete().eq('id', id);
-    },
+    mutationFn: async (id) => { await supabase.from('calendario_contatos').delete().eq('id', id); },
     onSuccess: () => { toast.success('Contato excluído'); qc.invalidateQueries(['cal-admin-contatos']); },
   });
 
@@ -181,12 +212,10 @@ export default function CalendarioAdmin() {
     setModalEvento(ev);
   }
 
-  // Verifica se slot está ativo
   function slotAtivo(dia, hora) {
     return disponibilidade.some(d => d.dia_semana === dia && formatHora(d.horario) === hora && d.ativo);
   }
 
-  // ── Render ─────────────────────────────────────────────────
   return (
     <div className="p-4 lg:p-8 pb-24 max-w-5xl mx-auto">
 
@@ -197,17 +226,33 @@ export default function CalendarioAdmin() {
           <h1 className="text-2xl font-bold text-slate-900">Calendário — Admin</h1>
         </div>
         <p className="text-slate-500 text-sm">Gestão completa de agendamentos</p>
+
+        {/* Google Agenda */}
+        <div className="flex items-center gap-3 mt-3">
+          {googleConectado ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-xs font-semibold text-emerald-700">Google Agenda conectado</span>
+            </div>
+          ) : (
+            <button onClick={connectGoogle}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
+              <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+              Conectar Google Agenda
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Abas */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6 overflow-x-auto">
         {[
-          { id: 'reunioes', label: 'Reuniões', icon: Calendar },
-          { id: 'eventos', label: 'Tipos de Evento', icon: Settings },
-          { id: 'disponibilidade', label: 'Disponibilidade', icon: Clock },
-          { id: 'estatisticas', label: 'Estatísticas', icon: BarChart2 },
-          { id: 'contatos', label: 'Contatos', icon: Users },
-          { id: 'solicitacoes', label: 'Solicitações', icon: Inbox },
+          { id: 'reunioes',       label: 'Reuniões',        icon: Calendar },
+          { id: 'eventos',        label: 'Tipos de Evento', icon: Settings },
+          { id: 'disponibilidade',label: 'Disponibilidade', icon: Clock },
+          { id: 'estatisticas',   label: 'Estatísticas',    icon: BarChart2 },
+          { id: 'contatos',       label: 'Contatos',        icon: Users },
+          { id: 'solicitacoes',   label: 'Solicitações',    icon: Inbox },
         ].map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setAba(id)}
             className={cn('flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
@@ -220,7 +265,6 @@ export default function CalendarioAdmin() {
       {/* ── ABA REUNIÕES ── */}
       {aba === 'reunioes' && (
         <div className="space-y-6">
-          {/* Filtros */}
           <div className="flex gap-3 flex-wrap">
             <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
               className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400">
@@ -234,23 +278,21 @@ export default function CalendarioAdmin() {
             </select>
           </div>
 
-          {/* Próximos */}
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Próximos ({proximos.length})</p>
             {proximos.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-6">Nenhum agendamento futuro.</p>
             ) : proximos.map(ag => (
-              <AgendamentoCard key={ag.id} ag={ag} onStatus={(status) => atualizarStatus.mutate({ id: ag.id, status })} />
+              <AgendamentoCard key={ag.id} ag={ag} onStatus={(status) => atualizarStatus.mutate({ id: ag.id, status, ag })} />
             ))}
           </div>
 
-          {/* Anteriores */}
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Anteriores ({anteriores.length})</p>
             {anteriores.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-6">Nenhum agendamento anterior.</p>
             ) : anteriores.map(ag => (
-              <AgendamentoCard key={ag.id} ag={ag} onStatus={(status) => atualizarStatus.mutate({ id: ag.id, status })} />
+              <AgendamentoCard key={ag.id} ag={ag} onStatus={(status) => atualizarStatus.mutate({ id: ag.id, status, ag })} />
             ))}
           </div>
         </div>
@@ -314,7 +356,7 @@ export default function CalendarioAdmin() {
                 {TODOS_HORARIOS.map(hora => (
                   <tr key={hora} className="border-t border-slate-100">
                     <td className="py-1.5 pr-3 text-slate-400 font-mono">{hora}</td>
-                    {[0, 1, 2, 3, 4, 5, 6].map(dia => {
+                    {[0,1,2,3,4,5,6].map(dia => {
                       const ativo = slotAtivo(dia, hora);
                       return (
                         <td key={dia} className="text-center py-1.5 px-1">
@@ -338,23 +380,20 @@ export default function CalendarioAdmin() {
       {/* ── ABA ESTATÍSTICAS ── */}
       {aba === 'estatisticas' && (
         <div className="space-y-6">
-          {/* Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: 'Total', value: stats.total, cor: 'text-blue-600', bg: 'bg-blue-50' },
-              { label: 'Concluídos', value: stats.concluidos, cor: 'text-emerald-600', bg: 'bg-emerald-50', pct: stats.total > 0 ? ((stats.concluidos/stats.total)*100).toFixed(0)+'%' : '–' },
-              { label: 'Cancelados', value: stats.cancelados, cor: 'text-red-500', bg: 'bg-red-50', pct: stats.total > 0 ? ((stats.cancelados/stats.total)*100).toFixed(0)+'%' : '–' },
-              { label: 'Reagendados', value: stats.reagendados, cor: 'text-amber-600', bg: 'bg-amber-50', pct: stats.total > 0 ? ((stats.reagendados/stats.total)*100).toFixed(0)+'%' : '–' },
-            ].map(({ label, value, cor, bg, pct }) => (
-              <div key={label} className={cn('rounded-2xl p-5 border border-slate-200 bg-white')}>
+              { label: 'Total',       value: stats.total,      cor: 'text-blue-600' },
+              { label: 'Concluídos',  value: stats.concluidos, cor: 'text-emerald-600', pct: stats.total > 0 ? ((stats.concluidos/stats.total)*100).toFixed(0)+'%' : '–' },
+              { label: 'Cancelados',  value: stats.cancelados, cor: 'text-red-500',     pct: stats.total > 0 ? ((stats.cancelados/stats.total)*100).toFixed(0)+'%' : '–' },
+              { label: 'Reagendados', value: stats.reagendados,cor: 'text-amber-600',   pct: stats.total > 0 ? ((stats.reagendados/stats.total)*100).toFixed(0)+'%' : '–' },
+            ].map(({ label, value, cor, pct }) => (
+              <div key={label} className="rounded-2xl p-5 border border-slate-200 bg-white">
                 <p className="text-xs text-slate-500 mb-1">{label}</p>
                 <p className={cn('text-3xl font-bold', cor)}>{value}</p>
                 {pct && <p className="text-xs text-slate-400 mt-1">{pct} do total</p>}
               </div>
             ))}
           </div>
-
-          {/* Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <p className="text-sm font-bold text-slate-700 mb-4">📅 Top 3 dias mais populares</p>
@@ -387,12 +426,8 @@ export default function CalendarioAdmin() {
             <div key={ct.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4">
               <div>
                 <p className="font-semibold text-slate-800 text-sm">{ct.nome}</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  <Phone className="w-3 h-3 inline mr-1" />{ct.whatsapp}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {ct.calendario_agendamentos?.length || 0} agendamento(s)
-                </p>
+                <p className="text-xs text-slate-500 mt-1"><Phone className="w-3 h-3 inline mr-1" />{ct.whatsapp}</p>
+                <p className="text-xs text-slate-400 mt-1">{ct.calendario_agendamentos?.length || 0} agendamento(s)</p>
               </div>
               <button onClick={() => { if (confirm('Excluir contato?')) excluirContato.mutate(ct.id); }}
                 className="p-2 hover:bg-red-50 rounded-lg transition-all">
@@ -444,7 +479,6 @@ export default function CalendarioAdmin() {
             <h3 className="font-bold text-slate-800 text-lg mb-5">
               {modalEvento === 'novo' ? 'Novo Evento' : 'Editar Evento'}
             </h3>
-
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nome do evento</label>
@@ -452,7 +486,6 @@ export default function CalendarioAdmin() {
                   placeholder="Ex: Consultoria Inicial"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Duração</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -465,7 +498,6 @@ export default function CalendarioAdmin() {
                   ))}
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Local</label>
                 <div className="flex gap-2">
@@ -483,7 +515,6 @@ export default function CalendarioAdmin() {
                     className="mt-2 w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
                 )}
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Limite por dia</label>
                 <div className="grid grid-cols-5 gap-2">
@@ -496,7 +527,6 @@ export default function CalendarioAdmin() {
                   ))}
                 </div>
               </div>
-
               <div className="flex items-center justify-between py-3 border-t border-slate-100">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Visível</p>
@@ -507,7 +537,6 @@ export default function CalendarioAdmin() {
                   <span className={cn('absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all', formEvento.visivel ? 'left-5' : 'left-0.5')} />
                 </button>
               </div>
-
               {!formEvento.visivel && (
                 <div className="flex items-center justify-between py-3 border-t border-slate-100">
                   <div>
@@ -521,7 +550,6 @@ export default function CalendarioAdmin() {
                 </div>
               )}
             </div>
-
             <div className="flex gap-3 mt-6">
               <button onClick={() => setModalEvento(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600">
                 Cancelar
@@ -538,7 +566,6 @@ export default function CalendarioAdmin() {
   );
 }
 
-// ── Card de agendamento ────────────────────────────────────
 function AgendamentoCard({ ag, onStatus }) {
   const [aberto, setAberto] = useState(false);
   return (
@@ -561,6 +588,7 @@ function AgendamentoCard({ ag, onStatus }) {
             <Phone className="w-3 h-3 inline mr-1" />{ag.calendario_contatos?.whatsapp} &nbsp;·&nbsp;
             <Clock className="w-3 h-3 inline mr-1" />{ag.duracao_min} min &nbsp;·&nbsp;
             <MapPin className="w-3 h-3 inline mr-1" />{ag.local_tipo}
+            {ag.google_event_id && <span className="ml-2 text-emerald-600 font-semibold">· ✓ Google Agenda</span>}
           </p>
           {ag.local_link && (
             <a href={ag.local_link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline block mb-3">{ag.local_link}</a>
