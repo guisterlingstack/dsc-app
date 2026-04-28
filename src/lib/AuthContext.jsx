@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
 const AuthContext = createContext();
@@ -6,64 +6,39 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser]           = useState(null);
   const [profile, setProfile]     = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // começa true — só vira false após confirmar sessão
-  const initialized = useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Listener primeiro — garante que nenhum evento seja perdido
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth event:', event, session?.user?.email || 'nenhum');
-
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          if (session?.user) await loadProfile(session.user);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setIsLoading(false);
-        } else if (event === 'INITIAL_SESSION') {
-          // INITIAL_SESSION é disparado uma vez na inicialização
-          // Se tem sessão, carrega perfil. Se não tem, libera loading.
-          if (session?.user) {
-            await loadProfile(session.user);
-          } else {
-            setIsLoading(false);
-          }
-          initialized.current = true;
-        }
+    // Busca sessão diretamente — mais confiável que esperar evento
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadProfile(session.user);
+      } else {
+        setIsLoading(false);
       }
-    );
+    });
 
-    // Fallback: se INITIAL_SESSION não disparar em 3s, tenta getSession manualmente
-    const fallbackTimer = setTimeout(async () => {
-      if (!initialized.current) {
-        console.log('Fallback: buscando sessão manualmente...');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          await loadProfile(session.user);
-        } else {
-          setIsLoading(false);
-        }
-        initialized.current = true;
+    // Listener para mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) loadProfile(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+        setIsLoading(false);
       }
-    }, 3000);
+    });
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(fallbackTimer);
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const loadProfile = async (authUser) => {
-    console.log('Carregando profile para:', authUser.email);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .maybeSingle();
-
-      console.log('Profile carregado:', data, 'erro:', error);
 
       setUser({
         id:                      authUser.id,
@@ -97,34 +72,25 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshProfile = async () => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) await loadProfile(authUser);
-    } catch (err) {
-      console.error('Erro no refreshProfile:', err);
-    }
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) await loadProfile(authUser);
   };
 
   const signIn = async (email, password) => {
-    console.log('Tentando login:', email);
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+      email: email.trim(), password,
     });
-    console.log('Login resultado:', { user: data?.user?.email, error });
     if (error) throw error;
     return data;
   };
 
   const signUp = async (email, password, fullName) => {
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
+      email: email.trim(), password,
       options: { data: { full_name: fullName } },
     });
     if (error) throw error;
-    await supabase
-      .from('clientes_autorizados')
+    await supabase.from('clientes_autorizados')
       .update({ usuario_criado: true })
       .eq('email', email.trim().toLowerCase());
     return data;
@@ -139,11 +105,7 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (updates) => {
     if (!user?.id) return;
     const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
+      .from('profiles').update(updates).eq('id', user.id).select().single();
     if (error) throw error;
     setProfile(data);
     setUser(prev => ({ ...prev, ...updates }));
@@ -152,18 +114,14 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{
-      user,
-      profile,
+      user, profile,
       isAuthenticated:         !!user,
       isLoading,
       isLoadingAuth:           isLoading,
       isLoadingPublicSettings: false,
-      signIn,
-      signUp,
-      signOut,
-      logout:                  signOut,
-      updateProfile,
-      refreshProfile,
+      signIn, signUp, signOut,
+      logout: signOut,
+      updateProfile, refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>
