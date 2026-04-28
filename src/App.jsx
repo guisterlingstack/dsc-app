@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import { queryClient } from '@/lib/query-client';
+import { queryClientInstance } from '@/lib/query-client';
 import { usePageTracking } from '@/hooks/usePageTracking';
 
 import Login from './pages/Login';
@@ -29,10 +29,7 @@ function AuthenticatedApp() {
   const location = useLocation();
   const pageName = location.pathname.replace('/', '') || 'Dashboard';
 
-  // Enquanto carrega NUNCA redireciona — espera confirmar sessão
   if (isLoading) return <LoadingScreen />;
-
-  // Só vai para login após confirmar ausência de sessão
   if (!user) return <Navigate to="/login" replace />;
 
   const isAdmin = ['admin', 'admin_master'].includes(user?.role);
@@ -67,7 +64,7 @@ function LoginGuard() {
 export default function App() {
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClientInstance}>
         <Router>
           <Routes>
             <Route path="/login"    element={<LoginGuard />} />
