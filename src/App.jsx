@@ -5,7 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { queryClientInstance } from '@/lib/query-client';
 import { usePageTracking } from '@/hooks/usePageTracking';
-
+import ResetPassword from './pages/ResetPassword';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import AdminOnboarding from './pages/AdminOnboarding';
