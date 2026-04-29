@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,10 +29,11 @@ export default function Login() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
-  const reset = () => { setError(''); setEmail(''); setPassword(''); setFullName(''); setConfirm(''); };
+  const reset = () => { setError(''); setResetMsg(''); setEmail(''); setPassword(''); setFullName(''); setConfirm(''); };
 
   const handleLogin = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
@@ -48,6 +50,17 @@ export default function Login() {
     try { await signUp(email, password, fullName); navigate('/Dashboard'); }
     catch (err) { setError(err.message || 'Erro ao criar conta. Tente novamente.'); }
     finally { setLoading(false); }
+  };
+
+  const handleEsqueciSenha = async () => {
+    if (!email) { setError('Digite seu email primeiro.'); return; }
+    setLoading(true); setError(''); setResetMsg('');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://dsc-app.pages.dev/ResetPassword',
+    });
+    if (error) setError('Erro ao enviar email. Tente novamente.');
+    else setResetMsg('Email de recuperação enviado! Verifique sua caixa de entrada.');
+    setLoading(false);
   };
 
   if (view === 'landing') {
@@ -82,15 +95,33 @@ export default function Login() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <div className="text-center mb-8"><div className="text-4xl mb-3">💰</div><h1 className="text-2xl font-bold text-slate-900">Entrar na sua conta</h1><p className="text-slate-500 text-sm mt-1">Dinheiro Sob Controle</p></div>
+          <div className="text-center mb-8">
+            <div className="text-4xl mb-3">💰</div>
+            <h1 className="text-2xl font-bold text-slate-900">Entrar na sua conta</h1>
+            <p className="text-slate-500 text-sm mt-1">Dinheiro Sob Controle</p>
+          </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
             <form onSubmit={handleLogin} className="space-y-4">
               <div><Label>Email</Label><Input type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 h-12" style={{fontSize:'16px'}} /></div>
               <div><Label>Senha</Label><Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 h-12" style={{fontSize:'16px'}} /></div>
               {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>}
-              <Button type="submit" className="w-full h-12 bg-slate-900 hover:bg-slate-800 rounded-xl text-base" disabled={loading}>{loading ? 'Entrando...' : 'Entrar'}</Button>
+              {resetMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-700">{resetMsg}</div>}
+              <Button type="submit" className="w-full h-12 bg-slate-900 hover:bg-slate-800 rounded-xl text-base" disabled={loading}>
+                {loading ? 'Entrando...' : 'Entrar'}
+              </Button>
+              <button
+                type="button"
+                onClick={handleEsqueciSenha}
+                disabled={loading}
+                className="w-full text-center text-xs text-slate-400 hover:text-slate-600 underline"
+              >
+                Esqueci minha senha
+              </button>
             </form>
-            <div className="mt-4 text-center text-sm text-slate-500">Não tem conta?{' '}<button onClick={() => { reset(); setView('cadastro'); }} className="text-emerald-600 font-medium hover:underline">Criar conta</button></div>
+            <div className="mt-4 text-center text-sm text-slate-500">
+              Não tem conta?{' '}
+              <button onClick={() => { reset(); setView('cadastro'); }} className="text-emerald-600 font-medium hover:underline">Criar conta</button>
+            </div>
           </div>
           <button onClick={() => setView('landing')} className="mt-4 w-full text-center text-sm text-slate-400 hover:text-slate-600">← Voltar</button>
         </div>
@@ -101,7 +132,11 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8"><div className="text-4xl mb-3">💰</div><h1 className="text-2xl font-bold text-slate-900">Criar sua conta</h1><p className="text-slate-500 text-sm mt-1">Dinheiro Sob Controle</p></div>
+        <div className="text-center mb-8">
+          <div className="text-4xl mb-3">💰</div>
+          <h1 className="text-2xl font-bold text-slate-900">Criar sua conta</h1>
+          <p className="text-slate-500 text-sm mt-1">Dinheiro Sob Controle</p>
+        </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <form onSubmit={handleCadastro} className="space-y-4">
             <div><Label>Nome completo</Label><Input type="text" placeholder="Seu nome" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="mt-1 h-12" style={{fontSize:'16px'}} /></div>
@@ -109,9 +144,14 @@ export default function Login() {
             <div><Label>Senha</Label><Input type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 h-12" style={{fontSize:'16px'}} /></div>
             <div><Label>Confirmar senha</Label><Input type="password" placeholder="Repita a senha" value={confirm} onChange={(e) => setConfirm(e.target.value)} required className="mt-1 h-12" style={{fontSize:'16px'}} /></div>
             {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>}
-            <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-base" disabled={loading}>{loading ? 'Criando conta...' : 'Criar conta'}</Button>
+            <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-base" disabled={loading}>
+              {loading ? 'Criando conta...' : 'Criar conta'}
+            </Button>
           </form>
-          <div className="mt-4 text-center text-sm text-slate-500">Já tem conta?{' '}<button onClick={() => { reset(); setView('login'); }} className="text-emerald-600 font-medium hover:underline">Entrar</button></div>
+          <div className="mt-4 text-center text-sm text-slate-500">
+            Já tem conta?{' '}
+            <button onClick={() => { reset(); setView('login'); }} className="text-emerald-600 font-medium hover:underline">Entrar</button>
+          </div>
         </div>
         <button onClick={() => setView('landing')} className="mt-4 w-full text-center text-sm text-slate-400 hover:text-slate-600">← Voltar</button>
       </div>
