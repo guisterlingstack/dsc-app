@@ -47,6 +47,7 @@ function AuthenticatedApp() {
         <Route path="/Onboarding"       element={<Onboarding />} />
         <Route path="/AdminOnboarding"  element={<AdminOnboarding />} />
         <Route path="/AdminAnalytics"   element={<AdminAnalytics />} />
+        <Route path="/ResetPassword" element={<ResetPassword />} />
         <Route path="/"                 element={<Navigate to="/Dashboard" replace />} />
         <Route path="*"                 element={<Navigate to="/Dashboard" replace />} />
       </Routes>
