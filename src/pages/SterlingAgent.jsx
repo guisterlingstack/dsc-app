@@ -34,7 +34,7 @@ function getMensagemLimite(plano) {
   return `Você atingiu o limite de conversas de hoje do plano ${plano === 'basic' ? 'Basic' : 'Pro'}. Para continuar, fale com o consultor e faça upgrade para o plano ${proximo}.`;
 }
 
-export default function SterlingAgent({ modulo }) {
+export default function SterlingAgentChat({ modulo }) {
   const { user } = useAuth();
   const location = useLocation();
   const qc = useQueryClient();
@@ -313,7 +313,7 @@ export function SterlingAgentPage() {
         </div>
         <p className="text-slate-500 text-sm">Seu assistente financeiro do Método Sterling</p>
       </div>
-      <SterlingAgent modulo="SterlingAgent" />
+      <SterlingAgentChat modulo="SterlingAgent" />
     </div>
   );
 }
