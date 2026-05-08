@@ -1,13 +1,6 @@
-const CACHE_NAME = 'dsc-cache-v3';
-const urlsToCache = [
-  '/',
-  '/index.html',
-];
+const CACHE_NAME = 'dsc-cache-v4';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
-  );
   self.skipWaiting();
 });
 
@@ -27,35 +20,31 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
-  // Ignora tudo que não seja http/https
+  // Ignora tudo que não seja GET
+  if (event.request.method !== 'GET') return;
+
+  // Ignora URLs não http/https
   if (!url.startsWith('http')) return;
 
-  // Nunca cacheia supabase (auth, banco de dados)
+  // Ignora Supabase
   if (url.includes('supabase.co')) return;
 
-  // Nunca cacheia requisições de autenticação
-  if (url.includes('/auth/') || url.includes('token')) return;
+  // Ignora API Anthropic
+  if (url.includes('anthropic.com')) return;
 
-  // Nunca cacheia APIs externas
-  if (url.includes('googletagmanager') || url.includes('analytics')) return;
+  // Ignora navegação entre rotas do app (deixa o React Router cuidar)
+  if (event.request.mode === 'navigate') return;
 
-  // Estratégia network-first: tenta rede, cai no cache se offline
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Só cacheia respostas válidas de GET
-        if (
-          event.request.method === 'GET' &&
-          response.status === 200 &&
-          response.type === 'basic'
-        ) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return response;
+  // Cache apenas assets estáticos
+  if (url.includes('/assets/') || url.includes('/icons/')) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        return cached || fetch(event.request).then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
+        });
       })
-      .catch(() => caches.match(event.request))
-  );
+    );
+  }
 });
