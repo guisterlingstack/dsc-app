@@ -18,6 +18,8 @@ import SmartBudgetSystem   from './pages/SmartBudgetSystem';
 import UserSettings        from './pages/UserSettings';
 import WeeklyRoutine       from './pages/WeeklyRoutine';
 import __Layout            from './Layout.jsx';
+import SterlingAgent       from './pages/SterlingAgent';
+import AdminSterling       from './pages/AdminSterling';
 
 export const PAGES = {
   AccelerationPlan,
@@ -25,6 +27,7 @@ export const PAGES = {
   AdminUsers,
   AdminAnalytics,
   AdminOnboarding,
+  AdminSterling,
   BankSetup,
   BudgetCalculator,
   CalendarioAdmin,
@@ -37,6 +40,7 @@ export const PAGES = {
   ReserveGoal,
   ReserveUsage,
   SmartBudgetSystem,
+  SterlingAgent,
   UserSettings,
   WeeklyRoutine,
 };
