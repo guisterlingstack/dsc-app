@@ -300,3 +300,20 @@ function ativacaoTrial({ userId, qc }) {
     </div>
   );
 }
+
+export function SterlingAgentPage() {
+  return (
+    <div className="p-4 lg:p-8 pb-24 max-w-3xl mx-auto">
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="p-2 bg-emerald-100 rounded-lg">
+            <Bot className="w-5 h-5 text-emerald-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Sterling Agent</h1>
+        </div>
+        <p className="text-slate-500 text-sm">Seu assistente financeiro do Método Sterling</p>
+      </div>
+      <SterlingAgent modulo="SterlingAgent" />
+    </div>
+  );
+}
