@@ -5,7 +5,7 @@ import {
   LayoutDashboard, TrendingUp, PiggyBank, Calendar,
   BookOpen, CreditCard, Target, Zap, Settings,
   Users, BarChart2, ClipboardList, ChevronRight,
-  LogOut, Menu, X, DollarSign,
+  LogOut, Menu, X, DollarSign, Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
