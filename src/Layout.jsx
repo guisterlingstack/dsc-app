@@ -21,6 +21,7 @@ const MENU_CLIENTE = [
   { label: 'Fechamento Mensal',  icon: BookOpen,         path: 'MonthlyClosing' },
   { label: 'Usar a Reserva?',    icon: PiggyBank,        path: 'ReserveUsage' },
   { label: 'Plano de Aceleração', icon: Zap,             path: 'AccelerationPlan' },
+  { label: 'Sterling Agent',     icon: Bot,              path: 'SterlingAgent' },
   { label: 'Configurações',      icon: Settings,         path: 'UserSettings' },
   { label: 'Calendário',         icon: Calendar,         path: 'CalendarioCliente' },
 ];
@@ -30,6 +31,7 @@ const MENU_ADMIN = [
   { label: 'Analytics',          icon: BarChart2,      path: 'AdminAnalytics' },
   { label: 'Onboarding',         icon: ClipboardList,  path: 'AdminOnboarding' },
   { label: 'Calendário Admin',   icon: Calendar,      path: 'CalendarioAdmin' },
+  { label: 'Sterling Admin',     icon: Bot,           path: 'AdminSterling' },
 ];
 
 export default function Layout({ children }) {
