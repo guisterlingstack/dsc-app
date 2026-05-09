@@ -12,6 +12,32 @@ import AdminOnboarding from './pages/AdminOnboarding';
 import AdminAnalytics from './pages/AdminAnalytics';
 import { pagesConfig } from './pages.config';
 
+function FaixaSenhaTemporaria() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+ 
+  if (!user?.senha_temporaria) return null;
+ 
+  const expira = user.senha_expira_em
+    ? new Date(user.senha_expira_em).toLocaleDateString('pt-BR')
+    : null;
+ 
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 bg-orange-500 text-white text-center py-2 px-4 text-xs font-semibold flex items-center justify-center gap-3">
+      <span>
+        🔑 Você está usando uma senha temporária
+        {expira ? ` — expira em ${expira}` : ''}. Troque agora para garantir o acesso.
+      </span>
+      <button
+        onClick={() => navigate('/UserSettings')}
+        className="underline font-bold hover:opacity-80"
+      >
+        Trocar senha
+      </button>
+    </div>
+  );
+}
+
 const { Pages, Layout } = pagesConfig;
 
 function LoadingScreen() {
