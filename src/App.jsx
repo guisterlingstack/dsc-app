@@ -65,8 +65,9 @@ function AuthenticatedApp() {
   }
 
   return (
-    <Layout>
-      <Routes>
+  <Layout>
+    <FaixaSenhaTemporaria />
+    <Routes>
         {Object.entries(Pages).map(([name, Component]) => (
           <Route key={name} path={`/${name}`} element={<Component />} />
         ))}
