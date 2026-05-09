@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminEntities } from '@/api/supabaseApi';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { Shield, Plus, Search, UserCheck, UserX, Clock, Settings, Key, ChevronDown, ChevronUp, Bot } from 'lucide-react';
+import { Shield, Plus, Search, UserCheck, UserX, Clock, Settings, Key, ChevronDown, ChevronUp, Bot, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -130,6 +130,24 @@ export default function AdminUsers() {
   const updateUserMutation = useMutation({
     mutationFn: ({ id, data }) => adminEntities.updateUser(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['all-users'] }),
+  });
+
+  const deleteUserMutation = useMutation({
+  mutationFn: async (userId) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ user_id: userId }),
+    });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || 'Erro ao deletar usuário');
+    },
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['all-users'] }),
+  onError: (e) => alert('Erro ao deletar: ' + e.message),
   });
 
   const updatePermissionMutation = useMutation({
@@ -303,15 +321,23 @@ export default function AdminUsers() {
                       </div>
                       {!isMe && isAdminMaster && (
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <Button size="sm" variant="outline" className="h-8 text-xs"
-                            onClick={() => updateUserMutation.mutate({ id: u.id, data: { status_conta: u.status_conta === 'ativa' ? 'bloqueada' : 'ativa' } })}>
-                            {u.status_conta === 'ativa' ? <UserX className="w-3.5 h-3.5 text-red-500" /> : <UserCheck className="w-3.5 h-3.5 text-emerald-500" />}
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 text-xs"
-                            onClick={() => setExpandedUser(isExpanded ? null : u.id)}>
-                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          </Button>
-                        </div>
+                            <Button size="sm" variant="outline" className="h-8 text-xs"
+                              onClick={() => updateUserMutation.mutate({ id: u.id, data: { status_conta: u.status_conta === 'ativa' ? 'bloqueada' : 'ativa' } })}>
+                              {u.status_conta === 'ativa' ? <UserX className="w-3.5 h-3.5 text-red-500" /> : <UserCheck className="w-3.5 h-3.5 text-emerald-500" />}
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8 text-xs"
+                              onClick={() => setExpandedUser(isExpanded ? null : u.id)}>
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8 text-xs border-red-200 hover:bg-red-50"
+                              onClick={() => {
+                      if (confirm(`Deletar ${u.full_name || u.email}? Esta ação é irreversível.`)) {
+                        deleteUserMutation.mutate(u.id);
+                        }
+                        }}>
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                            </Button>
+                      </div>
                       )}
                     </div>
 
