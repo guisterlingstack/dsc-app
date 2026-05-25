@@ -11,6 +11,7 @@ import Onboarding from './pages/Onboarding';
 import AdminOnboarding from './pages/AdminOnboarding';
 import AdminAnalytics from './pages/AdminAnalytics';
 import { pagesConfig } from './pages.config';
+import Videochamada from './pages/Videochamada';
 
 function FaixaSenhaTemporaria() {
   const { user } = useAuth();
@@ -99,6 +100,7 @@ export default function App() {
             <Route path="/cadastro" element={<LoginGuard />} />
             <Route path="/"         element={<Navigate to="/login" replace />} />
             <Route path="/*"        element={<AuthenticatedApp />} />
+            <Route path="/Videochamada/:salaId" element={<Videochamada />} />
           </Routes>
         </Router>
         <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
