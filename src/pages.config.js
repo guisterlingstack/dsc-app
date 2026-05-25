@@ -20,6 +20,7 @@ import WeeklyRoutine       from './pages/WeeklyRoutine';
 import __Layout            from './Layout.jsx';
 import SterlingAgent       from './pages/SterlingAgent';
 import AdminSterling       from './pages/AdminSterling';
+import Videochamada        from './pages/Videochamada';
 
 export const PAGES = {
   AccelerationPlan,
@@ -42,6 +43,7 @@ export const PAGES = {
   SmartBudgetSystem,
   SterlingAgent,
   UserSettings,
+  Videochamada,
   WeeklyRoutine,
 };
 
