@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Calendar, Clock, MapPin, History, Settings, ChevronLeft, ChevronRight, Check, AlertCircle, Phone, User } from 'lucide-react';
+import { Calendar, Clock, MapPin, History, Settings, ChevronLeft, ChevronRight, Check, AlertCircle, Phone, User, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -12,12 +13,12 @@ const STATUS_LABEL = { agendado: 'Agendado', confirmado: 'Confirmado', realizado
 const STATUS_COR = { agendado: 'bg-blue-100 text-blue-700', confirmado: 'bg-emerald-100 text-emerald-700', realizado: 'bg-slate-100 text-slate-600', cancelado: 'bg-red-100 text-red-600', reagendado: 'bg-amber-100 text-amber-700' };
 
 function formatHora(h) { return h.slice(0, 5); }
-function formatData(d) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function formatDataHora(d) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 
 export default function CalendarioCliente() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [aba, setAba] = useState('agendar');
   const [eventoSel, setEventoSel] = useState(null);
   const [semanaOffset, setSemanaOffset] = useState(0);
@@ -27,13 +28,9 @@ export default function CalendarioCliente() {
   const [contato, setContato] = useState({ nome: '', whatsapp: '' });
   const [editContato, setEditContato] = useState(false);
 
-  // ── Dados ──────────────────────────────────────────────────
   const { data: eventos = [] } = useQuery({
     queryKey: ['cal-eventos-cliente'],
-    queryFn: async () => {
-      const { data } = await supabase.from('calendario_eventos').select('*').eq('visivel', true).order('nome');
-      return data || [];
-    },
+    queryFn: async () => { const { data } = await supabase.from('calendario_eventos').select('*').eq('visivel', true).order('nome'); return data || []; },
   });
 
   const { data: contatoSalvo } = useQuery({
@@ -61,13 +58,9 @@ export default function CalendarioCliente() {
 
   const { data: disponibilidade = [] } = useQuery({
     queryKey: ['cal-disponibilidade'],
-    queryFn: async () => {
-      const { data } = await supabase.from('calendario_disponibilidade').select('*').eq('ativo', true).order('dia_semana').order('horario');
-      return data || [];
-    },
+    queryFn: async () => { const { data } = await supabase.from('calendario_disponibilidade').select('*').eq('ativo', true).order('dia_semana').order('horario'); return data || []; },
   });
 
-  // Semana atual
   const hoje = new Date();
   const inicioSemana = new Date(hoje);
   inicioSemana.setDate(hoje.getDate() - hoje.getDay() + semanaOffset * 7);
@@ -78,12 +71,10 @@ export default function CalendarioCliente() {
     return d;
   });
 
-  // Horários do dia selecionado
   const horariosDia = diaSel !== null
     ? disponibilidade.filter(d => d.dia_semana === diaSel.getDay()).map(d => d.horario)
     : [];
 
-  // Agendamentos já existentes no dia selecionado
   const { data: agendamentosDia = [] } = useQuery({
     queryKey: ['cal-ag-dia', diaSel?.toDateString()],
     queryFn: async () => {
@@ -101,12 +92,10 @@ export default function CalendarioCliente() {
     enabled: !!diaSel,
   });
 
-  // Verifica se horário está ocupado
   function horarioOcupado(hora) {
     if (!eventoSel) return false;
     const [h, m] = hora.split(':').map(Number);
-    const inicio = new Date(diaSel);
-    inicio.setHours(h, m, 0, 0);
+    const inicio = new Date(diaSel); inicio.setHours(h, m, 0, 0);
     const fim = new Date(inicio.getTime() + eventoSel.duracao_min * 60000);
     return agendamentosDia.some(ag => {
       const agInicio = new Date(ag.data_hora);
@@ -115,14 +104,14 @@ export default function CalendarioCliente() {
     });
   }
 
-  // Verifica reunião ativa do cliente
   const reuniaoAtiva = historico.find(h => ['agendado', 'confirmado', 'reagendado'].includes(h.status) && new Date(h.data_hora) > new Date());
-
-  // Verifica regra dos 7 dias (primeira consultoria)
   const jaTeveConsultoria = historico.some(h => h.status === 'realizado');
-  const podeMaisRapido = jaTeveConsultoria;
 
-  // ── Mutations ──────────────────────────────────────────────
+  const { data: eventosOcultos = [] } = useQuery({
+    queryKey: ['cal-eventos-ocultos'],
+    queryFn: async () => { const { data } = await supabase.from('calendario_eventos').select('*').eq('visivel', false).eq('permite_interesse', true); return data || []; },
+  });
+
   const salvarContato = useMutation({
     mutationFn: async () => {
       if (!contato.nome.trim() || !contato.whatsapp.trim()) throw new Error('Preencha todos os campos');
@@ -139,30 +128,21 @@ export default function CalendarioCliente() {
       if (!contatoSalvo) throw new Error('Preencha seus dados de contato primeiro');
       if (reuniaoAtiva) throw new Error('Você já possui uma reunião ativa');
       if (!eventoSel || !diaSel || !horarioSel) throw new Error('Selecione evento, data e horário');
-
       const [h, m] = horarioSel.split(':').map(Number);
-      const dataHora = new Date(diaSel);
-      dataHora.setHours(h, m, 0, 0);
-
-      if (!podeMaisRapido) {
+      const dataHora = new Date(diaSel); dataHora.setHours(h, m, 0, 0);
+      if (!jaTeveConsultoria) {
         const minData = new Date(); minData.setDate(minData.getDate() + 7);
         if (dataHora < minData) throw new Error('Sua primeira consultoria deve ser agendada com pelo menos 7 dias de antecedência');
       }
-
       await supabase.from('calendario_agendamentos').insert({
-        user_id: user.id,
-        evento_id: eventoSel.id,
-        data_hora: dataHora.toISOString(),
-        duracao_min: eventoSel.duracao_min,
-        local_tipo: eventoSel.local_tipo,
-        local_link: eventoSel.local_link,
-        status: 'agendado',
+        user_id: user.id, evento_id: eventoSel.id,
+        data_hora: dataHora.toISOString(), duracao_min: eventoSel.duracao_min,
+        local_tipo: eventoSel.local_tipo, local_link: eventoSel.local_link, status: 'agendado',
       });
     },
     onSuccess: () => {
       toast.success('Agendamento realizado!');
-      qc.invalidateQueries(['cal-historico']);
-      qc.invalidateQueries(['cal-ag-dia']);
+      qc.invalidateQueries(['cal-historico']); qc.invalidateQueries(['cal-ag-dia']);
       setEventoSel(null); setDiaSel(null); setHorarioSel(null);
       setAba('historico');
     },
@@ -173,8 +153,7 @@ export default function CalendarioCliente() {
     mutationFn: async (eventoId) => {
       if (!contato.nome || !contato.whatsapp) throw new Error('Preencha seus dados primeiro');
       await supabase.from('calendario_solicitacoes').insert({
-        user_id: user.id,
-        evento_id: eventoId,
+        user_id: user.id, evento_id: eventoId,
         nome: contatoSalvo?.nome || contato.nome,
         whatsapp: contatoSalvo?.whatsapp || contato.whatsapp,
         status: 'pendente',
@@ -184,16 +163,6 @@ export default function CalendarioCliente() {
     onError: (e) => toast.error(e.message),
   });
 
-  // ── Eventos ocultos (com interesse) ───────────────────────
-  const { data: eventosOcultos = [] } = useQuery({
-    queryKey: ['cal-eventos-ocultos'],
-    queryFn: async () => {
-      const { data } = await supabase.from('calendario_eventos').select('*').eq('visivel', false).eq('permite_interesse', true);
-      return data || [];
-    },
-  });
-
-  // ── Render ─────────────────────────────────────────────────
   return (
     <div className="p-4 lg:p-8 pb-24 max-w-3xl mx-auto">
 
@@ -221,11 +190,9 @@ export default function CalendarioCliente() {
         ))}
       </div>
 
-      {/* ── ABA AGENDAR ── */}
+      {/* ABA AGENDAR */}
       {aba === 'agendar' && (
         <div className="space-y-6">
-
-          {/* Aviso sem contato */}
           {!contatoSalvo && (
             <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -237,7 +204,6 @@ export default function CalendarioCliente() {
             </div>
           )}
 
-          {/* Aviso reunião ativa */}
           {reuniaoAtiva && (
             <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <Clock className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
@@ -248,7 +214,7 @@ export default function CalendarioCliente() {
             </div>
           )}
 
-          {/* Passo 1: Escolher evento */}
+          {/* Passo 1: Evento */}
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">1. Escolha o tipo de consultoria</p>
             <div className="grid gap-2">
@@ -268,8 +234,6 @@ export default function CalendarioCliente() {
                   </div>
                 </button>
               ))}
-
-              {/* Eventos ocultos com interesse */}
               {eventosOcultos.map(ev => (
                 <button key={ev.id} onClick={() => setModalOculto(ev)}
                   className="w-full text-left p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 transition-all">
@@ -280,41 +244,31 @@ export default function CalendarioCliente() {
             </div>
           </div>
 
-          {/* Passo 2: Escolher data */}
+          {/* Passo 2: Data */}
           {eventoSel && !reuniaoAtiva && (
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">2. Escolha a data</p>
               <div className="bg-white border border-slate-200 rounded-xl p-4">
-                {/* Navegação semana */}
                 <div className="flex items-center justify-between mb-4">
-                  <button onClick={() => setSemanaOffset(s => s - 1)} className="p-1.5 rounded-lg hover:bg-slate-100">
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
+                  <button onClick={() => setSemanaOffset(s => s - 1)} className="p-1.5 rounded-lg hover:bg-slate-100"><ChevronLeft className="w-4 h-4" /></button>
                   <span className="text-sm font-semibold text-slate-700">
-                    {diasSemana[0].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} –{' '}
-                    {diasSemana[6].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {diasSemana[0].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} – {diasSemana[6].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </span>
-                  <button onClick={() => setSemanaOffset(s => s + 1)} className="p-1.5 rounded-lg hover:bg-slate-100">
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  <button onClick={() => setSemanaOffset(s => s + 1)} className="p-1.5 rounded-lg hover:bg-slate-100"><ChevronRight className="w-4 h-4" /></button>
                 </div>
-
-                {/* Dias */}
                 <div className="grid grid-cols-7 gap-1">
                   {diasSemana.map((dia, i) => {
                     const temHorarios = disponibilidade.some(d => d.dia_semana === dia.getDay());
                     const passado = dia < new Date(hoje.setHours(0,0,0,0));
                     const selecionado = diaSel?.toDateString() === dia.toDateString();
                     return (
-                      <button key={i}
-                        disabled={!temHorarios || passado}
-                        onClick={() => { setDiaSel(dia); setHorarioSel(null); }}
+                      <button key={i} disabled={!temHorarios || passado} onClick={() => { setDiaSel(dia); setHorarioSel(null); }}
                         className={cn('flex flex-col items-center py-2 px-1 rounded-lg text-xs transition-all',
                           selecionado ? 'bg-blue-500 text-white' :
                           !temHorarios || passado ? 'opacity-30 cursor-not-allowed text-slate-400' :
                           'hover:bg-blue-50 text-slate-700 cursor-pointer')}>
                         <span className="font-medium mb-1">{DIAS_SEMANA[dia.getDay()]}</span>
-                        <span className={cn('font-bold text-sm', selecionado ? 'text-white' : '')}>{dia.getDate()}</span>
+                        <span className="font-bold text-sm">{dia.getDate()}</span>
                       </button>
                     );
                   })}
@@ -323,7 +277,7 @@ export default function CalendarioCliente() {
             </div>
           )}
 
-          {/* Passo 3: Escolher horário */}
+          {/* Passo 3: Horário */}
           {diaSel && !reuniaoAtiva && (
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
@@ -337,8 +291,7 @@ export default function CalendarioCliente() {
                     const ocupado = horarioOcupado(hora);
                     const sel = horarioSel === hora;
                     return (
-                      <button key={hora} disabled={ocupado}
-                        onClick={() => setHorarioSel(hora)}
+                      <button key={hora} disabled={ocupado} onClick={() => setHorarioSel(hora)}
                         className={cn('py-2 rounded-lg text-xs font-semibold transition-all border',
                           sel ? 'bg-blue-500 text-white border-blue-500' :
                           ocupado ? 'bg-slate-100 text-slate-300 cursor-not-allowed border-slate-100' :
@@ -352,18 +305,17 @@ export default function CalendarioCliente() {
             </div>
           )}
 
-          {/* Botão confirmar */}
+          {/* Confirmar */}
           {horarioSel && contatoSalvo && !reuniaoAtiva && (
-            <button onClick={() => agendar.mutate()}
-              disabled={agendar.isPending}
+            <button onClick={() => agendar.mutate()} disabled={agendar.isPending}
               className="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition-all text-sm disabled:opacity-60">
-              {agendar.isPending ? 'Agendando...' : `Confirmar agendamento — ${formatHora(horarioSel)} de ${diaSel?.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`}
+              {agendar.isPending ? 'Agendando...' : `Confirmar — ${formatHora(horarioSel)} de ${diaSel?.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`}
             </button>
           )}
         </div>
       )}
 
-      {/* ── ABA HISTÓRICO ── */}
+      {/* ABA HISTÓRICO */}
       {aba === 'historico' && (
         <div className="space-y-3">
           {historico.length === 0 ? (
@@ -386,7 +338,18 @@ export default function CalendarioCliente() {
                   {STATUS_LABEL[ag.status]}
                 </span>
               </div>
-              {ag.local_link && (
+
+              {/* Botão de videochamada — aparece só quando admin ativou */}
+              {ag.chamada_ativa && ag.chamada_sala_id && (
+                <button
+                  onClick={() => navigate(`/Videochamada/${ag.chamada_sala_id}`)}
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-all">
+                  <Video className="w-4 h-4" />
+                  Entrar na videochamada
+                </button>
+              )}
+
+              {ag.local_link && !ag.chamada_ativa && (
                 <a href={ag.local_link} target="_blank" rel="noopener noreferrer"
                   className="mt-3 block text-center py-2 bg-blue-50 text-blue-600 text-xs font-semibold rounded-lg hover:bg-blue-100 transition-all">
                   Acessar link da reunião
@@ -397,45 +360,32 @@ export default function CalendarioCliente() {
         </div>
       )}
 
-      {/* ── ABA CONFIGURAÇÕES ── */}
+      {/* ABA CONFIGURAÇÕES */}
       {aba === 'configuracoes' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
           <div>
             <h3 className="font-bold text-slate-800 mb-1">Dados de contato</h3>
             <p className="text-xs text-slate-500">Obrigatório para realizar agendamentos.</p>
           </div>
-
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                <User className="w-3 h-3 inline mr-1" />Nome completo
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5"><User className="w-3 h-3 inline mr-1" />Nome completo</label>
               <input value={contato.nome} onChange={e => setContato(p => ({ ...p, nome: e.target.value }))}
-                disabled={!!contatoSalvo && !editContato}
-                placeholder="Seu nome completo"
+                disabled={!!contatoSalvo && !editContato} placeholder="Seu nome completo"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-500" />
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                <Phone className="w-3 h-3 inline mr-1" />WhatsApp
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5"><Phone className="w-3 h-3 inline mr-1" />WhatsApp</label>
               <input value={contato.whatsapp} onChange={e => setContato(p => ({ ...p, whatsapp: e.target.value }))}
-                disabled={!!contatoSalvo && !editContato}
-                placeholder="+55 12 999999999"
+                disabled={!!contatoSalvo && !editContato} placeholder="+55 12 999999999"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-500" />
               <p className="text-xs text-slate-400 mt-1">Formato: +DDI DDD Número</p>
             </div>
           </div>
-
           {contatoSalvo && !editContato ? (
-            <button onClick={() => setEditContato(true)}
-              className="w-full py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all">
-              Editar dados
-            </button>
+            <button onClick={() => setEditContato(true)} className="w-full py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all">Editar dados</button>
           ) : (
-            <button onClick={() => salvarContato.mutate()}
-              disabled={salvarContato.isPending}
+            <button onClick={() => salvarContato.mutate()} disabled={salvarContato.isPending}
               className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-semibold transition-all disabled:opacity-60">
               {salvarContato.isPending ? 'Salvando...' : 'Salvar dados'}
             </button>
@@ -448,16 +398,10 @@ export default function CalendarioCliente() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
             <h3 className="font-bold text-slate-800 mb-2">{modalOculto.nome}</h3>
-            <p className="text-sm text-slate-600 mb-6">
-              O consultor entrará em contato via WhatsApp para alinhar os detalhes.
-            </p>
+            <p className="text-sm text-slate-600 mb-6">O consultor entrará em contato via WhatsApp para alinhar os detalhes.</p>
             <div className="flex gap-3">
-              <button onClick={() => setModalOculto(null)}
-                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600">
-                Cancelar
-              </button>
-              <button onClick={() => solicitarOculto.mutate(modalOculto.id)}
-                disabled={solicitarOculto.isPending}
+              <button onClick={() => setModalOculto(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600">Cancelar</button>
+              <button onClick={() => solicitarOculto.mutate(modalOculto.id)} disabled={solicitarOculto.isPending}
                 className="flex-1 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-all disabled:opacity-60">
                 {solicitarOculto.isPending ? 'Enviando...' : 'Confirmar interesse'}
               </button>
