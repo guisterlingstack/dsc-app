@@ -10,19 +10,19 @@ import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import AdminOnboarding from './pages/AdminOnboarding';
 import AdminAnalytics from './pages/AdminAnalytics';
-import { pagesConfig } from './pages.config';
 import Videochamada from './pages/Videochamada';
+import { pagesConfig } from './pages.config';
 
 function FaixaSenhaTemporaria() {
   const { user } = useAuth();
   const navigate = useNavigate();
- 
+
   if (!user?.senha_temporaria) return null;
- 
+
   const expira = user.senha_expira_em
     ? new Date(user.senha_expira_em).toLocaleDateString('pt-BR')
     : null;
- 
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-orange-500 text-white text-center py-2 px-4 text-xs font-semibold flex items-center justify-center gap-3">
       <span>
@@ -66,18 +66,18 @@ function AuthenticatedApp() {
   }
 
   return (
-  <Layout>
-    <FaixaSenhaTemporaria />
-    <Routes>
+    <Layout>
+      <FaixaSenhaTemporaria />
+      <Routes>
         {Object.entries(Pages).map(([name, Component]) => (
           <Route key={name} path={`/${name}`} element={<Component />} />
         ))}
-        <Route path="/Onboarding"       element={<Onboarding />} />
-        <Route path="/AdminOnboarding"  element={<AdminOnboarding />} />
-        <Route path="/AdminAnalytics"   element={<AdminAnalytics />} />
-        <Route path="/ResetPassword" element={<ResetPassword />} />
-        <Route path="/"                 element={<Navigate to="/Dashboard" replace />} />
-        <Route path="*"                 element={<Navigate to="/Dashboard" replace />} />
+        <Route path="/Onboarding"      element={<Onboarding />} />
+        <Route path="/AdminOnboarding" element={<AdminOnboarding />} />
+        <Route path="/AdminAnalytics"  element={<AdminAnalytics />} />
+        <Route path="/ResetPassword"   element={<ResetPassword />} />
+        <Route path="/"                element={<Navigate to="/Dashboard" replace />} />
+        <Route path="*"                element={<Navigate to="/Dashboard" replace />} />
       </Routes>
     </Layout>
   );
@@ -96,11 +96,11 @@ export default function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <Routes>
-            <Route path="/login"    element={<LoginGuard />} />
-            <Route path="/cadastro" element={<LoginGuard />} />
-            <Route path="/"         element={<Navigate to="/login" replace />} />
-            <Route path="/*"        element={<AuthenticatedApp />} />
+            <Route path="/login"                element={<LoginGuard />} />
+            <Route path="/cadastro"             element={<LoginGuard />} />
             <Route path="/Videochamada/:salaId" element={<Videochamada />} />
+            <Route path="/"                     element={<Navigate to="/login" replace />} />
+            <Route path="/*"                    element={<AuthenticatedApp />} />
           </Routes>
         </Router>
         <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
