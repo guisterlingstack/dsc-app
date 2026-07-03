@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Calendar, Users, BarChart2, Settings, Inbox, Clock, MapPin, Edit2, Trash2, Phone, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { connectGoogle, isGoogleConnected, handleGoogleCallback, criarEventoGoogle, cancelarEventoGoogle } from '@/lib/googleCalendar';
+import { connectGoogle, isGoogleConnected, handleGoogleCallback, disconnectGoogle, criarEventoGoogle, cancelarEventoGoogle, GoogleRevokedError } from '@/lib/googleCalendar';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 const STATUS_LABEL = { agendado: 'Agendado', confirmado: 'Confirmado', realizado: 'Realizado', cancelado: 'Cancelado', reagendado: 'Reagendado' };
@@ -37,9 +37,13 @@ export default function CalendarioAdmin() {
   const [googleConectado, setGoogleConectado] = useState(isGoogleConnected());
 
   useEffect(() => {
-    if (window.location.hash.includes('access_token')) {
-      const ok = handleGoogleCallback();
-      if (ok) { setGoogleConectado(true); toast.success('Google Agenda conectado!'); }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('code')) {
+      handleGoogleCallback()
+        .then((ok) => {
+          if (ok) { setGoogleConectado(true); toast.success('Google Agenda conectado!'); }
+        })
+        .catch((e) => toast.error(e.message));
     }
   }, []);
 
@@ -124,8 +128,10 @@ export default function CalendarioAdmin() {
   const atualizarStatus = useMutation({
     mutationFn: async ({ id, status, ag }) => {
       await supabase.from('calendario_agendamentos').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
-      if (status === 'confirmado' && googleConectado && ag) {
-        try {
+
+      try {
+        // Confirmado → cria evento no Google
+        if (status === 'confirmado' && googleConectado && ag && !ag.google_event_id) {
           const googleId = await criarEventoGoogle({
             titulo: `${ag.calendario_eventos?.nome} — ${ag.calendario_contatos?.nome}`,
             dataHora: ag.data_hora, duracaoMin: ag.duracao_min,
@@ -133,10 +139,20 @@ export default function CalendarioAdmin() {
             descricao: `WhatsApp: ${ag.calendario_contatos?.whatsapp || ''}`,
           });
           if (googleId) await supabase.from('calendario_agendamentos').update({ google_event_id: googleId }).eq('id', id);
-        } catch (err) { toast.error('Atualizado, mas erro no Google: ' + err.message); }
-      }
-      if (status === 'cancelado' && ag?.google_event_id) {
-        try { await cancelarEventoGoogle(ag.google_event_id); } catch {}
+        }
+
+        // Cancelado ou Reagendado → cancela o evento antigo no Google
+        if (['cancelado', 'reagendado'].includes(status) && ag?.google_event_id) {
+          await cancelarEventoGoogle(ag.google_event_id);
+          await supabase.from('calendario_agendamentos').update({ google_event_id: null }).eq('id', id);
+        }
+      } catch (err) {
+        if (err instanceof GoogleRevokedError) {
+          setGoogleConectado(false);
+          toast.error(err.message);
+        } else {
+          toast.error('Status atualizado, mas erro no Google: ' + err.message);
+        }
       }
     },
     onSuccess: () => qc.invalidateQueries(['cal-admin-ag']),
@@ -180,9 +196,21 @@ export default function CalendarioAdmin() {
         <p className="text-slate-500 text-sm">Gestão completa de agendamentos</p>
         <div className="flex items-center gap-3 mt-3">
           {googleConectado ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-xs font-semibold text-emerald-700">Google Agenda conectado</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-xs font-semibold text-emerald-700">Google Agenda conectado</span>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm('Desconectar o Google Agenda? Novos eventos deixarão de sincronizar.')) return;
+                  await disconnectGoogle();
+                  setGoogleConectado(false);
+                  toast.success('Google Agenda desconectado');
+                }}
+                className="text-xs font-semibold text-slate-500 hover:text-red-600 underline transition-colors">
+                Desconectar
+              </button>
             </div>
           ) : (
             <button onClick={connectGoogle}
