@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Calendar, Users, BarChart2, Settings, Inbox, Clock, MapPin, Edit2, Trash2, Phone, ChevronDown, Video, VideoOff } from 'lucide-react';
+import { Calendar, Users, BarChart2, Settings, Inbox, Clock, MapPin, Edit2, Trash2, Phone, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { connectGoogle, isGoogleConnected, handleGoogleCallback, criarEventoGoogle, cancelarEventoGoogle } from '@/lib/googleCalendar';
@@ -30,7 +29,6 @@ const TODOS_HORARIOS = gerarHorarios();
 export default function CalendarioAdmin() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [aba, setAba] = useState('reunioes');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroEvento, setFiltroEvento] = useState('');
@@ -145,21 +143,6 @@ export default function CalendarioAdmin() {
     onError: () => toast.error('Erro ao atualizar status'),
   });
 
-  const ativarChamada = useMutation({
-    mutationFn: async ({ agId, ativar }) => {
-      const salaId = ativar ? `sala-${agId}-${Date.now()}` : null;
-      await supabase.from('calendario_agendamentos').update({
-        chamada_ativa:   ativar,
-        chamada_sala_id: salaId,
-      }).eq('id', agId);
-      return salaId;
-    },
-    onSuccess: (_, vars) => {
-      qc.invalidateQueries(['cal-admin-ag']);
-      toast.success(vars.ativar ? 'Sala de vídeo ativada!' : 'Sala desativada');
-    },
-    onError: () => toast.error('Erro ao atualizar chamada'),
-  });
 
   const atualizarStatusSol = useMutation({
     mutationFn: async ({ id, status }) => { await supabase.from('calendario_solicitacoes').update({ status, updated_at: new Date().toISOString() }).eq('id', id); },
@@ -251,8 +234,6 @@ export default function CalendarioAdmin() {
               : proximos.map(ag => (
                 <AgendamentoCard key={ag.id} ag={ag}
                   onStatus={(status) => atualizarStatus.mutate({ id: ag.id, status, ag })}
-                  onChamada={(ativar) => ativarChamada.mutate({ agId: ag.id, ativar })}
-                  onEntrarChamada={() => navigate(`/Videochamada/${ag.chamada_sala_id}`)}
                 />
               ))}
           </div>
@@ -263,8 +244,6 @@ export default function CalendarioAdmin() {
               : anteriores.map(ag => (
                 <AgendamentoCard key={ag.id} ag={ag}
                   onStatus={(status) => atualizarStatus.mutate({ id: ag.id, status, ag })}
-                  onChamada={(ativar) => ativarChamada.mutate({ agId: ag.id, ativar })}
-                  onEntrarChamada={() => navigate(`/Videochamada/${ag.chamada_sala_id}`)}
                 />
               ))}
           </div>
@@ -500,7 +479,7 @@ export default function CalendarioAdmin() {
 }
 
 // ── Card de agendamento ────────────────────────────────────
-function AgendamentoCard({ ag, onStatus, onChamada, onEntrarChamada }) {
+function AgendamentoCard({ ag, onStatus }) {
   const [aberto, setAberto] = useState(false);
   return (
     <div className="bg-white border border-slate-200 rounded-xl mb-3 overflow-hidden">
@@ -508,11 +487,6 @@ function AgendamentoCard({ ag, onStatus, onChamada, onEntrarChamada }) {
         <div>
           <div className="flex items-center gap-2">
             <p className="font-semibold text-slate-800 text-sm">{ag.calendario_contatos?.nome || 'Cliente'}</p>
-            {ag.chamada_ativa && (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                <Video className="w-3 h-3" /> Sala ativa
-              </span>
-            )}
           </div>
           <p className="text-xs text-slate-500 mt-1">{ag.calendario_eventos?.nome} · {new Date(ag.data_hora).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
@@ -523,28 +497,6 @@ function AgendamentoCard({ ag, onStatus, onChamada, onEntrarChamada }) {
       </div>
       {aberto && (
         <div className="border-t border-slate-100 p-4 bg-slate-50 space-y-3">
-
-          {/* Controle de Videochamada */}
-          <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-            <Video className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-blue-800">Videochamada</p>
-              <p className="text-xs text-blue-600">{ag.chamada_ativa ? 'Sala ativa — cliente pode entrar' : 'Sala inativa'}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {ag.chamada_ativa && (
-                <button onClick={onEntrarChamada}
-                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg transition-all">
-                  Entrar
-                </button>
-              )}
-              <button onClick={() => onChamada(!ag.chamada_ativa)}
-                className={cn('px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border',
-                  ag.chamada_ativa ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50')}>
-                {ag.chamada_ativa ? 'Desativar' : 'Ativar sala'}
-              </button>
-            </div>
-          </div>
 
           {/* Info */}
           <p className="text-xs text-slate-500">
