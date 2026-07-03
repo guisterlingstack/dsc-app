@@ -1,127 +1,140 @@
 // ── WebRTC via Supabase Realtime ──────────────────────────────
-// Sinalização peer-to-peer sem servidor de mídia externo
-// Funciona para 2 participantes (admin + cliente)
+// Sinalização peer-to-peer para 2 participantes (admin + cliente)
+// v2: handshake de presença + fila de ICE candidates
 
 import { supabase } from '@/lib/supabaseClient';
 
 export class WebRTCManager {
   constructor({ salaId, userId, isAdmin, onRemoteStream, onConnectionChange }) {
-    this.salaId        = salaId;
-    this.userId        = userId;
-    this.isAdmin       = isAdmin;
-    this.onRemoteStream    = onRemoteStream;
+    this.salaId             = salaId;
+    this.userId             = userId;
+    this.isAdmin            = isAdmin;
+    this.onRemoteStream     = onRemoteStream;
     this.onConnectionChange = onConnectionChange;
 
-    this.pc          = null; // RTCPeerConnection
-    this.localStream = null;
-    this.channel     = null; // Supabase Realtime channel
+    this.pc                = null;
+    this.localStream       = null;
+    this.channel           = null;
+    this.pendingCandidates = []; // ICE que chegam antes da remoteDescription
+    this.remoteSet         = false;
+    this.encerrado         = false;
   }
 
   // ── Inicializa conexão ──────────────────────────────────────
-  async iniciar({ video = true, audio = true, tela = false }) {
+  async iniciar({ video = true, audio = true }) {
+    this.localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
+
+    this.pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+    });
+
+    this.localStream.getTracks().forEach(track => {
+      this.pc.addTrack(track, this.localStream);
+    });
+
+    this.pc.ontrack = (event) => {
+      if (this.onRemoteStream) this.onRemoteStream(event.streams[0]);
+    };
+
+    this.pc.onconnectionstatechange = () => {
+      if (this.onConnectionChange) this.onConnectionChange(this.pc.connectionState);
+    };
+
+    this.pc.onicecandidate = ({ candidate }) => {
+      if (candidate) {
+        this._enviar({ tipo: 'ice', candidate: candidate.toJSON(), de: this.userId });
+      }
+    };
+
+    // Canal de sinalização
+    this.channel = supabase.channel(`videochamada:${this.salaId}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    this.channel.on('broadcast', { event: 'sinal' }, ({ payload }) => {
+      this._processarSinal(payload);
+    });
+
+    await this.channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        // Handshake de presença:
+        // - cliente anuncia "entrei" → admin envia oferta
+        // - admin anuncia "admin-pronto" → cliente (se já estava) reenvia "entrei"
+        if (this.isAdmin) {
+          this._enviar({ tipo: 'admin-pronto', de: this.userId });
+        } else {
+          this._enviar({ tipo: 'entrei', de: this.userId });
+        }
+      }
+    });
+
+    return this.localStream;
+  }
+
+  _enviar(payload) {
     try {
-      // Pede permissões de mídia
-      if (tela) {
-        const telaStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        const micStream  = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        const tracks     = [...telaStream.getTracks(), ...micStream.getAudioTracks()];
-        this.localStream = new MediaStream(tracks);
-      } else {
-        this.localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
-      }
-
-      // Cria peer connection
-      this.pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-        ],
-      });
-
-      // Adiciona tracks locais
-      this.localStream.getTracks().forEach(track => {
-        this.pc.addTrack(track, this.localStream);
-      });
-
-      // Quando receber stream remoto
-      this.pc.ontrack = (event) => {
-        if (this.onRemoteStream) {
-          this.onRemoteStream(event.streams[0]);
-        }
-      };
-
-      // Monitora estado da conexão
-      this.pc.onconnectionstatechange = () => {
-        if (this.onConnectionChange) {
-          this.onConnectionChange(this.pc.connectionState);
-        }
-      };
-
-      // Inscreve no canal de sinalização via Supabase Realtime
-      this.channel = supabase.channel(`videochamada:${this.salaId}`, {
-        config: { broadcast: { self: false } },
-      });
-
-      this.channel.on('broadcast', { event: 'sinal' }, ({ payload }) => {
-        this._processarSinal(payload);
-      });
-
-      await this.channel.subscribe();
-
-      // ICE candidates — envia para o outro participante
-      this.pc.onicecandidate = ({ candidate }) => {
-        if (candidate) {
-          this.channel.send({
-            type: 'broadcast',
-            event: 'sinal',
-            payload: { tipo: 'ice', candidate: candidate.toJSON(), de: this.userId },
-          });
-        }
-      };
-
-      // Admin cria a oferta, cliente aguarda
-      if (this.isAdmin) {
-        await this._criarOferta();
-      }
-
-      return this.localStream;
-    } catch (err) {
-      console.error('Erro ao iniciar WebRTC:', err);
-      throw err;
+      this.channel?.send({ type: 'broadcast', event: 'sinal', payload });
+    } catch (e) {
+      console.warn('Falha ao enviar sinal:', e);
     }
   }
 
-  // ── Admin cria oferta ───────────────────────────────────────
+  // ── Admin cria/reenvia oferta ───────────────────────────────
   async _criarOferta() {
+    // Não recria se já conectado
+    if (['connected', 'connecting'].includes(this.pc.connectionState)) return;
     const offer = await this.pc.createOffer();
     await this.pc.setLocalDescription(offer);
-    this.channel.send({
-      type: 'broadcast',
-      event: 'sinal',
-      payload: { tipo: 'oferta', sdp: offer, de: this.userId },
-    });
+    this.remoteSet = false;
+    this._enviar({ tipo: 'oferta', sdp: offer, de: this.userId });
+  }
+
+  async _aplicarRemota(sdp) {
+    await this.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    this.remoteSet = true;
+    // Descarrega ICE candidates que chegaram cedo demais
+    for (const c of this.pendingCandidates) {
+      try { await this.pc.addIceCandidate(new RTCIceCandidate(c)); } catch {}
+    }
+    this.pendingCandidates = [];
   }
 
   // ── Processa sinais recebidos ───────────────────────────────
   async _processarSinal({ tipo, sdp, candidate, de }) {
-    if (de === this.userId) return; // ignora próprios sinais
+    if (de === this.userId || this.encerrado) return;
 
     try {
-      if (tipo === 'oferta') {
-        await this.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      if (tipo === 'entrei' && this.isAdmin) {
+        // Cliente entrou (agora ou reentrou) → admin envia a oferta
+        await this._criarOferta();
+
+      } else if (tipo === 'admin-pronto' && !this.isAdmin) {
+        // Admin entrou depois do cliente → cliente se anuncia novamente
+        this._enviar({ tipo: 'entrei', de: this.userId });
+
+      } else if (tipo === 'oferta' && !this.isAdmin) {
+        await this._aplicarRemota(sdp);
         const answer = await this.pc.createAnswer();
         await this.pc.setLocalDescription(answer);
-        this.channel.send({
-          type: 'broadcast',
-          event: 'sinal',
-          payload: { tipo: 'resposta', sdp: answer, de: this.userId },
-        });
-      } else if (tipo === 'resposta') {
-        await this.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        this._enviar({ tipo: 'resposta', sdp: answer, de: this.userId });
+
+      } else if (tipo === 'resposta' && this.isAdmin) {
+        if (this.pc.signalingState === 'have-local-offer') {
+          await this._aplicarRemota(sdp);
+        }
+
       } else if (tipo === 'ice') {
-        await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+        if (this.remoteSet) {
+          try { await this.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+        } else {
+          this.pendingCandidates.push(candidate); // guarda para depois
+        }
+
       } else if (tipo === 'encerrar') {
-        this.encerrar();
+        if (this.onConnectionChange) this.onConnectionChange('disconnected');
       }
     } catch (err) {
       console.error('Erro ao processar sinal:', err);
@@ -130,46 +143,33 @@ export class WebRTCManager {
 
   // ── Encerra conexão ─────────────────────────────────────────
   async encerrar() {
-    // Avisa o outro participante
-    if (this.channel) {
-      this.channel.send({
-        type: 'broadcast',
-        event: 'sinal',
-        payload: { tipo: 'encerrar', de: this.userId },
-      });
-    }
+    if (this.encerrado) return;
+    this.encerrado = true;
 
-    // Para tracks locais
+    this._enviar({ tipo: 'encerrar', de: this.userId });
+
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => t.stop());
       this.localStream = null;
     }
-
-    // Fecha peer connection
     if (this.pc) {
       this.pc.close();
       this.pc = null;
     }
-
-    // Remove canal
     if (this.channel) {
       await supabase.removeChannel(this.channel);
       this.channel = null;
     }
   }
 
-  // ── Ativa/desativa microfone ────────────────────────────────
   toggleMicrofone() {
-    if (!this.localStream) return false;
-    const audio = this.localStream.getAudioTracks()[0];
+    const audio = this.localStream?.getAudioTracks()[0];
     if (audio) { audio.enabled = !audio.enabled; return audio.enabled; }
     return false;
   }
 
-  // ── Ativa/desativa câmera ───────────────────────────────────
   toggleCamera() {
-    if (!this.localStream) return false;
-    const video = this.localStream.getVideoTracks()[0];
+    const video = this.localStream?.getVideoTracks()[0];
     if (video) { video.enabled = !video.enabled; return video.enabled; }
     return false;
   }
