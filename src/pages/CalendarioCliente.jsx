@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Calendar, Clock, MapPin, History, Settings, ChevronLeft, ChevronRight, Check, AlertCircle, Phone, User, Video } from 'lucide-react';
+import { Calendar, Clock, MapPin, History, Settings, ChevronLeft, ChevronRight, Check, AlertCircle, Phone, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -18,7 +17,6 @@ function formatDataHora(d) { return new Date(d).toLocaleDateString('pt-BR', { da
 export default function CalendarioCliente() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [aba, setAba] = useState('agendar');
   const [eventoSel, setEventoSel] = useState(null);
   const [semanaOffset, setSemanaOffset] = useState(0);
@@ -339,17 +337,7 @@ export default function CalendarioCliente() {
                 </span>
               </div>
 
-              {/* Botão de videochamada — aparece só quando admin ativou */}
-              {ag.chamada_ativa && ag.chamada_sala_id && (
-                <button
-                  onClick={() => navigate(`/Videochamada/${ag.chamada_sala_id}`)}
-                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition-all">
-                  <Video className="w-4 h-4" />
-                  Entrar na videochamada
-                </button>
-              )}
-
-              {ag.local_link && !ag.chamada_ativa && (
+              {ag.local_link && (
                 <a href={ag.local_link} target="_blank" rel="noopener noreferrer"
                   className="mt-3 block text-center py-2 bg-blue-50 text-blue-600 text-xs font-semibold rounded-lg hover:bg-blue-100 transition-all">
                   Acessar link da reunião
