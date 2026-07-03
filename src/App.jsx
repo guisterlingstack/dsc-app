@@ -10,7 +10,6 @@ import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import AdminOnboarding from './pages/AdminOnboarding';
 import AdminAnalytics from './pages/AdminAnalytics';
-import Videochamada from './pages/Videochamada';
 import { pagesConfig } from './pages.config';
 
 function FaixaSenhaTemporaria() {
@@ -98,7 +97,6 @@ export default function App() {
           <Routes>
             <Route path="/login"                element={<LoginGuard />} />
             <Route path="/cadastro"             element={<LoginGuard />} />
-            <Route path="/Videochamada/:salaId" element={<Videochamada />} />
             <Route path="/"                     element={<Navigate to="/login" replace />} />
             <Route path="/*"                    element={<AuthenticatedApp />} />
           </Routes>
