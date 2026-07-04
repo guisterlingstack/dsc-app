@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { entities } from '@/api/supabaseApi';
 import { useAuth } from '@/lib/AuthContext';
 import AccessControl from '@/components/AccessControl';
-import { Shield, AlertTriangle, XCircle, AlertCircle, Check, ChevronRight, ChevronLeft, HelpCircle, Phone } from 'lucide-react';
+import { Shield, AlertTriangle, XCircle, AlertCircle, Check, ChevronRight, ChevronLeft, HelpCircle, Phone, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -113,9 +113,12 @@ export default function ReserveUsage() {
     <AccessControl>
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-3xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Usar a Reserva?</h1>
-            <p className="text-slate-500 text-sm mt-1">Guia completo para tomar a decisão certa</p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg flex-shrink-0"><Wallet className="w-5 h-5 text-[#C9A84C]" /></div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Usar a Reserva?</h1>
+              <p className="text-slate-500 text-sm mt-1">Guia completo para tomar a decisão certa</p>
+            </div>
           </div>
 
           {/* Saldo */}
