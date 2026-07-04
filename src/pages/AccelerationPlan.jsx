@@ -1,10 +1,10 @@
 // AccelerationPlan.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { entities } from '@/api/supabaseApi';
 import { useAuth } from '@/lib/AuthContext';
 import AccessControl from '@/components/AccessControl';
-import { Rocket, Scissors, ShoppingBag, Briefcase, Plus, Trash2, TrendingUp } from 'lucide-react';
+import { Rocket, Scissors, ShoppingBag, Briefcase, Plus, Trash2, TrendingUp, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,8 @@ export default function AccelerationPlan() {
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newEntry, setNewEntry] = useState({ strategy: 'corte_vazamentos', description: '', amount: '', date: new Date().toISOString().split('T')[0] });
+  const [simuladorAberto, setSimuladorAberto] = useState(false);
+  const [rendaExtra, setRendaExtra] = useState('');
   const queryClient = useQueryClient();
 
   const { data: entries = [] } = useQuery({ queryKey: ['acceleration-entries'], queryFn: () => entities.AccelerationPlan.list('-date'), enabled: !!user });
@@ -44,12 +46,25 @@ export default function AccelerationPlan() {
   const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
   const totalAcceleration = entries.reduce((s, e) => s + (e.amount || 0), 0);
 
+  // ── Simulador de Impacto ──────────────────────────────────
+  const extra          = parseFloat(rendaExtra) || 0;
+  const aporteAtual    = profile?.monthly_contribution || 0;
+  const metaReserva    = profile?.minimum_reserve_goal || 0;
+  const reservaAtual   = profile?.current_reserve || 0;
+  const faltaReserva   = Math.max(metaReserva - reservaAtual, 0);
+  const mesesAtual     = aporteAtual > 0 ? Math.ceil(faltaReserva / aporteAtual) : 0;
+  const mesesComExtra  = (aporteAtual + extra) > 0 ? Math.ceil(faltaReserva / (aporteAtual + extra)) : 0;
+  const mesesEconomizados = Math.max(mesesAtual - mesesComExtra, 0);
+
   return (
     <AccessControl>
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div><h1 className="text-2xl font-bold text-slate-900">Plano de Aceleração</h1><p className="text-slate-500 text-sm mt-1">Acelere sua reserva com estratégias extras em 90 dias</p></div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-[#C9A84C]/15 rounded-lg"><Rocket className="w-5 h-5 text-[#C9A84C]" /></div>
+              <div><h1 className="text-2xl font-bold text-slate-900">Plano de Aceleração</h1><p className="text-slate-500 text-sm mt-1">Acelere sua reserva com estratégias extras em 90 dias</p></div>
+            </div>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild><Button className="bg-slate-900 hover:bg-slate-800"><Plus className="w-4 h-4 mr-2" />Registrar Valor</Button></DialogTrigger>
               <DialogContent>
@@ -70,6 +85,61 @@ export default function AccelerationPlan() {
               <div className="flex items-start gap-4"><div className="p-3 bg-white/20 rounded-2xl"><TrendingUp className="w-6 h-6" /></div><div><p className="text-emerald-100 mb-1">Total Acelerado</p><p className="text-3xl font-bold">{fmt(totalAcceleration)}</p><p className="text-emerald-100 mt-1">{entries.length} {entries.length === 1 ? 'ação registrada' : 'ações registradas'}</p></div></div>
             </div>
           )}
+
+          {/* ── Simulador de Impacto ── */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-[#C9A84C]" />
+                <h2 className="font-semibold text-slate-900">Simulador de Impacto</h2>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setSimuladorAberto(!simuladorAberto)}>{simuladorAberto ? 'Fechar' : 'Abrir'}</Button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Veja quantos meses você economiza somando uma renda extra ao seu aporte mensal.</p>
+
+            {simuladorAberto && (
+              <div className="space-y-4">
+                {!profile ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                    Configure primeiro seu aporte mensal e sua meta de reserva (em "Pague-se Primeiro" e "Meta de Reserva") para usar o simulador.
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label>Quanto deseja ganhar a mais por mês? (R$)</Label>
+                      <Input type="number" placeholder="0,00" value={rendaExtra} onChange={(e) => setRendaExtra(e.target.value)} className="mt-1 h-11" style={{fontSize:'16px'}} />
+                    </div>
+                    {extra > 0 && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-50 rounded-xl p-4">
+                            <h3 className="font-semibold text-slate-900 text-sm mb-3">Sem renda extra</h3>
+                            <p className="text-xs text-slate-500">Aporte mensal</p>
+                            <p className="text-xl font-bold text-slate-900">{fmt(aporteAtual)}</p>
+                            <p className="text-xs text-slate-500 mt-2">Tempo até a meta</p>
+                            <p className="text-xl font-bold text-slate-900">{mesesAtual} {mesesAtual === 1 ? 'mês' : 'meses'}</p>
+                          </div>
+                          <div className="bg-[#C9A84C]/10 rounded-xl p-4 border-2 border-[#C9A84C]/30">
+                            <h3 className="font-semibold text-slate-900 text-sm mb-3">Com renda extra</h3>
+                            <p className="text-xs text-slate-600">Aporte mensal</p>
+                            <p className="text-xl font-bold text-slate-900">{fmt(aporteAtual + extra)}</p>
+                            <p className="text-xs text-slate-600 mt-2">Tempo até a meta</p>
+                            <p className="text-xl font-bold text-slate-900">{mesesComExtra} {mesesComExtra === 1 ? 'mês' : 'meses'}</p>
+                          </div>
+                        </div>
+                        {mesesEconomizados > 0 && (
+                          <div className="bg-slate-900 rounded-xl p-4 text-center">
+                            <p className="text-slate-300 text-sm mb-1">Impacto total</p>
+                            <p className="text-2xl font-bold text-[#C9A84C]">{mesesEconomizados} {mesesEconomizados === 1 ? 'mês' : 'meses'} mais rápido!</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {strategies.map(s => {
