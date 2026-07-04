@@ -80,9 +80,12 @@ export default function BankSetup() {
     <AccessControl>
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-3xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Configuração das 3 Contas</h1>
-            <p className="text-slate-500 text-sm mt-1">Guia passo a passo para organizar sua vida financeira</p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg flex-shrink-0"><Landmark className="w-5 h-5 text-[#C9A84C]" /></div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Config. das 3 Contas</h1>
+              <p className="text-slate-500 text-sm mt-1">Guia passo a passo para organizar sua vida financeira</p>
+            </div>
           </div>
 
           {/* Tabs */}
