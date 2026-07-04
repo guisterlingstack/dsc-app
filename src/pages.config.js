@@ -8,19 +8,16 @@ import AdminOnboarding     from './pages/AdminOnboarding';
 import BankSetup           from './pages/BankSetup';
 import BudgetCalculator    from './pages/BudgetCalculator';
 import Dashboard           from './pages/Dashboard';
-import IncomeAccelerator   from './pages/IncomeAccelerator';
 import LeakageDetector     from './pages/LeakageDetector';
 import MonthlyClosing      from './pages/MonthlyClosing';
 import PayYourselfFirst    from './pages/PayYourselfFirst';
 import ReserveGoal         from './pages/ReserveGoal';
 import ReserveUsage        from './pages/ReserveUsage';
-import SmartBudgetSystem   from './pages/SmartBudgetSystem';
 import UserSettings        from './pages/UserSettings';
 import WeeklyRoutine       from './pages/WeeklyRoutine';
 import __Layout            from './Layout.jsx';
 import SterlingAgent       from './pages/SterlingAgent';
 import AdminSterling       from './pages/AdminSterling';
-import Videochamada        from './pages/Videochamada';
 
 export const PAGES = {
   AccelerationPlan,
@@ -34,16 +31,13 @@ export const PAGES = {
   CalendarioAdmin,
   CalendarioCliente,
   Dashboard,
-  IncomeAccelerator,
   LeakageDetector,
   MonthlyClosing,
   PayYourselfFirst,
   ReserveGoal,
   ReserveUsage,
-  SmartBudgetSystem,
   SterlingAgent,
   UserSettings,
-  Videochamada,
   WeeklyRoutine,
 };
 
