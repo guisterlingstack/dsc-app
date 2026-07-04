@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Calendar, Clock, MapPin, History, Settings, ChevronLeft, ChevronRight, Check, AlertCircle, Phone, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import AccessControl from '@/components/AccessControl';
 import toast from 'react-hot-toast';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -14,7 +15,7 @@ const STATUS_COR = { agendado: 'bg-blue-100 text-blue-700', confirmado: 'bg-emer
 function formatHora(h) { return h.slice(0, 5); }
 function formatDataHora(d) { return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 
-export default function CalendarioCliente() {
+function CalendarioClienteInner() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [aba, setAba] = useState('agendar');
@@ -167,7 +168,7 @@ export default function CalendarioCliente() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
-          <div className="p-2 bg-blue-100 rounded-lg"><Calendar className="w-5 h-5 text-blue-600" /></div>
+          <div className="p-2 bg-[#C9A84C]/15 rounded-lg"><Calendar className="w-5 h-5 text-[#C9A84C]" /></div>
           <h1 className="text-2xl font-bold text-slate-900">Calendário Sob Controle</h1>
         </div>
         <p className="text-slate-500 text-sm">Agende sua consultoria financeira</p>
@@ -398,5 +399,13 @@ export default function CalendarioCliente() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CalendarioCliente() {
+  return (
+    <AccessControl>
+      <CalendarioClienteInner />
+    </AccessControl>
   );
 }
