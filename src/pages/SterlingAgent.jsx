@@ -4,28 +4,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Send, Bot, User, Lock, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import AccessControl from '@/components/AccessControl';
 
-const SYSTEM_PROMPT = `Você é Sterling, o assistente financeiro oficial do Dinheiro Sob Controle — o sistema criado pelo Método Sterling para ajudar profissionais a organizarem suas finanças e construírem sua reserva de emergência.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
-Seu papel é responder dúvidas dos clientes sobre o Método Sterling e o sistema DSC. Você combina precisão técnica com linguagem acessível — fala como um consultor experiente mas próximo, sem enrolação.
-
-VOCÊ RESPONDE APENAS sobre:
-- O Método Sterling e seus 3 módulos (Diagnóstico, Automação, Controle)
-- A fórmula 50/30/20 e como aplicá-la
-- O sistema de 3 contas bancárias
-- Categorização de gastos (essencial vs estilo de vida)
-- Quando usar ou não a reserva de emergência
-- Check semanal e fechamento mensal
-- Os módulos do app DSC
-
-VOCÊ NÃO RESPONDE sobre:
-- Investimentos em renda variável, ações, cripto
-- Indicações de produtos financeiros específicos
-- Assuntos fora do escopo do Método Sterling
-
-Seja direto, claro e objetivo. Use exemplos com valores em reais quando ajudar.`;
-
-export default function SterlingAgent() {
+function SterlingAgentInner() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [input, setInput] = useState('');
@@ -85,39 +68,29 @@ export default function SterlingAgent() {
 
   const enviarMensagem = useMutation({
     mutationFn: async (pergunta) => {
+      // A2/A3: chamada via Edge Function — chave Anthropic fica no servidor
       const historico = mensagens.slice(-10).map(m => ({ role: m.role, content: m.content }));
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/sterling-agent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1000,
-          system: SYSTEM_PROMPT,
-          messages: [...historico, { role: 'user', content: pergunta }],
-        }),
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ pergunta, historico }),
       });
 
       const data = await res.json();
-      const resposta = data.content?.[0]?.text || 'Não consegui processar. Tente novamente.';
 
-      await supabase.from('agent_conversas').insert({
-        user_id: user.id,
-        modulo: 'SterlingAgent',
-        pergunta,
-        resposta,
-        tokens_input: data.usage?.input_tokens || 0,
-        tokens_output: data.usage?.output_tokens || 0,
-      });
+      if (!res.ok) {
+        if (data.error === 'limite_atingido') throw new Error(data.mensagem);
+        if (data.error === 'trial_expirado')  throw new Error(data.mensagem);
+        if (data.error === 'sem_assinatura')  throw new Error(data.mensagem);
+        throw new Error('Erro ao processar. Tente novamente.');
+      }
 
-      const hoje = new Date().toISOString().split('T')[0];
-      await supabase.from('agent_uso_diario').upsert({
-        user_id: user.id,
-        data: hoje,
-        conversas: usoDia + 1,
-      }, { onConflict: 'user_id,data' });
-
-      return resposta;
+      return data.resposta;
     },
     onSuccess: (resposta) => {
       setMensagens(prev => [...prev, { role: 'assistant', content: resposta }]);
@@ -163,7 +136,7 @@ export default function SterlingAgent() {
       <div className="p-4 lg:p-8 max-w-3xl mx-auto">
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-1">
-            <div className="p-2 bg-emerald-100 rounded-lg"><Bot className="w-5 h-5 text-emerald-600" /></div>
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg"><Bot className="w-5 h-5 text-[#C9A84C]" /></div>
             <h1 className="text-2xl font-bold text-slate-900">Sterling Agent</h1>
           </div>
           <p className="text-slate-500 text-sm">Seu assistente financeiro do Método Sterling</p>
@@ -192,7 +165,7 @@ export default function SterlingAgent() {
       <div className="p-4 lg:p-8 max-w-3xl mx-auto">
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-1">
-            <div className="p-2 bg-emerald-100 rounded-lg"><Bot className="w-5 h-5 text-emerald-600" /></div>
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg"><Bot className="w-5 h-5 text-[#C9A84C]" /></div>
             <h1 className="text-2xl font-bold text-slate-900">Sterling Agent</h1>
           </div>
         </div>
@@ -209,7 +182,7 @@ export default function SterlingAgent() {
     <div className="p-4 lg:p-8 pb-24 max-w-3xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
-          <div className="p-2 bg-emerald-100 rounded-lg"><Bot className="w-5 h-5 text-emerald-600" /></div>
+          <div className="p-2 bg-[#C9A84C]/15 rounded-lg"><Bot className="w-5 h-5 text-[#C9A84C]" /></div>
           <h1 className="text-2xl font-bold text-slate-900">Sterling Agent</h1>
         </div>
         <p className="text-slate-500 text-sm">Seu assistente financeiro do Método Sterling</p>
@@ -298,5 +271,13 @@ export default function SterlingAgent() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SterlingAgent() {
+  return (
+    <AccessControl>
+      <SterlingAgentInner />
+    </AccessControl>
   );
 }
