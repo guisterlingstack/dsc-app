@@ -44,7 +44,10 @@ export default function ReserveGoal() {
     <AccessControl>
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-2xl mx-auto space-y-6">
-          <div><h1 className="text-2xl font-bold text-slate-900">Meta de Reserva</h1><p className="text-slate-500 text-sm mt-1">Calcule sua meta personalizada baseada nas suas despesas fixas</p></div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg flex-shrink-0"><Target className="w-5 h-5 text-[#C9A84C]" /></div>
+            <div><h1 className="text-2xl font-bold text-slate-900">Meta de Reserva</h1><p className="text-slate-500 text-sm mt-1">Calcule sua meta personalizada baseada nas suas despesas fixas</p></div>
+          </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
             <Label className="text-base font-semibold">Total das suas despesas fixas mensais</Label>
             <p className="text-sm text-slate-500 mb-4">Aluguel, contas, alimentação, transporte e outros gastos essenciais</p>
