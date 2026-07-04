@@ -31,7 +31,7 @@ export default function UserSettings() {
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-100 rounded-lg"><User className="w-5 h-5 text-slate-600" /></div>
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg"><User className="w-5 h-5 text-[#C9A84C]" /></div>
             <div><h1 className="text-2xl font-bold text-slate-900">Configurações</h1><p className="text-slate-500 text-sm">Personalize sua experiência</p></div>
           </div>
 
