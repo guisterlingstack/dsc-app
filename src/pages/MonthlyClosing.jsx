@@ -117,7 +117,7 @@ export default function MonthlyClosing() {
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Checklist Mensal</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Fechamento Mensal</h1>
             <p className="text-slate-500 text-sm mt-1">Revisão completa em 15 minutos · Todo dia 1º do mês</p>
           </div>
 
@@ -361,7 +361,7 @@ export default function MonthlyClosing() {
                 <Button onClick={() => setStep(2)} variant="outline" className="h-12"><ChevronLeft className="w-4 h-4 mr-2" />Voltar</Button>
                 <Button onClick={handleSave} disabled={saveMutation.isPending}
                   className={cn('flex-1 h-12', form.saved ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-900 hover:bg-slate-800')}>
-                  {form.saved ? <><Check className="w-4 h-4 mr-2" />Checklist Salvo!</> : saveMutation.isPending ? 'Salvando...' : '✔ Concluir Checklist Mensal'}
+                  {form.saved ? <><Check className="w-4 h-4 mr-2" />Checklist Salvo!</> : saveMutation.isPending ? 'Salvando...' : '✔ Concluir Fechamento Mensal'}
                 </Button>
               </div>
             </div>
