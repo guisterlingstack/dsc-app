@@ -50,7 +50,10 @@ export default function PayYourselfFirst() {
     <AccessControl>
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-2xl mx-auto space-y-6">
-          <div><h1 className="text-2xl font-bold text-slate-900">Pague-se Primeiro</h1><p className="text-slate-500 text-sm mt-1">Defina quanto você vai poupar todo mês antes de qualquer outro gasto</p></div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg flex-shrink-0"><PiggyBank className="w-5 h-5 text-[#C9A84C]" /></div>
+            <div><h1 className="text-2xl font-bold text-slate-900">Pague-se Primeiro</h1><p className="text-slate-500 text-sm mt-1">Defina quanto você vai poupar todo mês antes de qualquer outro gasto</p></div>
+          </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
             <Label className="text-base font-semibold">Qual é sua renda mensal líquida?</Label>
             <p className="text-sm text-slate-500 mb-4">O valor que cai na sua conta após todos os descontos</p>
