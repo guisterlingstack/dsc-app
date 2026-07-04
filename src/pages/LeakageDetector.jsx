@@ -282,9 +282,12 @@ export default function LeakageDetector() {
     <AccessControl>
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-4xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Detector de Vazamentos Financeiros</h1>
-            <p className="text-slate-500 text-sm mt-1">Identifique R$400-800/mês desperdiçados sem perceber</p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/15 rounded-lg flex-shrink-0"><Search className="w-5 h-5 text-[#C9A84C]" /></div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Detector de Vazamentos</h1>
+              <p className="text-slate-500 text-sm mt-1">Identifique R$400-800/mês desperdiçados sem perceber</p>
+            </div>
           </div>
 
           {/* Tabs */}
