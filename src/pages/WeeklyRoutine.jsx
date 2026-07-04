@@ -142,7 +142,7 @@ export default function WeeklyRoutine() {
       <div className="p-4 lg:p-10 pb-24 lg:pb-10">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Controle Semanal</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Check Semanal</h1>
             <p className="text-slate-500 text-sm mt-1">10 minutos todo domingo para manter o controle</p>
           </div>
 
@@ -326,7 +326,7 @@ export default function WeeklyRoutine() {
           {tab === 'instrucoes' && (
             <div className="space-y-4">
               <div className="bg-slate-900 text-white rounded-2xl p-5">
-                <h3 className="font-bold text-lg mb-3">Como usar o Controle Semanal</h3>
+                <h3 className="font-bold text-lg mb-3">Como usar o Check Semanal</h3>
                 <div className="space-y-3">
                   {[
                     { n: '1', title: 'Todo domingo: 10 minutos', desc: 'Reserve 10 minutos no domingo para o check-in da semana' },
