@@ -5,7 +5,8 @@ import { useAuth } from '@/lib/AuthContext';
 import AccessControl from '@/components/AccessControl';
 import {
   Search, PiggyBank, Target, Landmark, CalendarCheck,
-  Rocket, AlertCircle, Plus, Zap, Pencil, Trash2
+  Rocket, AlertCircle, Plus, Zap, Pencil, Trash2,
+  Calculator, ClipboardCheck, Wallet
 } from 'lucide-react';
 import ReserveProgress from '@/components/dashboard/ReserveProgress';
 import NextAction from '@/components/dashboard/NextAction';
@@ -307,8 +308,11 @@ export default function Dashboard() {
               <ActionCard title="Detector de Vazamentos" description={leakages.length ? `${leakages.length} vazamentos registrados` : 'Identifique seus gastos invisíveis'} icon={Search} href="LeakageDetector" completed={leakages.length > 0} />
               <ActionCard title="Pague-se Primeiro" description={financialProfile?.monthly_contribution ? fmt(financialProfile.monthly_contribution) + '/mês' : 'Defina seu aporte mensal'} icon={PiggyBank} href="PayYourselfFirst" completed={!!financialProfile?.monthly_contribution} />
               <ActionCard title="Meta de Reserva" description={financialProfile?.minimum_reserve_goal ? `Meta: ${fmt(financialProfile.minimum_reserve_goal)}` : 'Calcule sua meta'} icon={Target} href="ReserveGoal" completed={!!financialProfile?.minimum_reserve_goal} />
-              <ActionCard title="Config. Bancária" description={`${checklistProgress.completed}/${checklistProgress.total} itens concluídos`} icon={Landmark} href="BankSetup" completed={checklistProgress.completed === checklistProgress.total} />
+              <ActionCard title="Config. das 3 Contas" description={`${checklistProgress.completed}/${checklistProgress.total} itens concluídos`} icon={Landmark} href="BankSetup" completed={checklistProgress.completed === checklistProgress.total} />
+              <ActionCard title="Calculadora 50/30/20" description="Calcule sua divisão ideal de renda" icon={Calculator} href="BudgetCalculator" completed={!!financialProfile?.savings_percentage} />
               <ActionCard title="Check Semanal" description="Monitore seus gastos com semáforo" icon={CalendarCheck} href="WeeklyRoutine" />
+              <ActionCard title="Fechamento Mensal" description="Feche o mês e avalie seu progresso" icon={ClipboardCheck} href="MonthlyClosing" />
+              <ActionCard title="Usar a Reserva?" description="Decida com clareza quando usar" icon={Wallet} href="ReserveUsage" />
               <ActionCard title="Plano de Aceleração" description="Acelere sua reserva em 90 dias" icon={Rocket} href="AccelerationPlan" />
             </div>
           </div>
