@@ -1,6 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -46,8 +49,8 @@ export const AuthProvider = ({ children }) => {
         full_name:               data?.full_name               || authUser.user_metadata?.full_name || '',
         display_name:            data?.display_name            || '',
         role:                    data?.role                    || authUser.user_metadata?.role || 'user',
-        status_conta:            data?.status_conta            || 'ativa',
-        has_main_mentorship:     data?.has_main_mentorship     ?? true,
+        status_conta:            data?.status_conta            || 'pendente',
+        has_main_mentorship:     data?.has_main_mentorship     ?? false,
         has_smart_budget_system: data?.has_smart_budget_system ?? false,
         has_income_accelerator:  data?.has_income_accelerator  ?? false,
         acesso_ate:              data?.acesso_ate              || null,
@@ -62,8 +65,8 @@ export const AuthProvider = ({ children }) => {
         email:               authUser.email,
         full_name:           authUser.user_metadata?.full_name || '',
         role:                authUser.user_metadata?.role || 'user',
-        status_conta:        'ativa',
-        has_main_mentorship: true,
+        status_conta:        'pendente',
+        has_main_mentorship: false,
         onboarding_completo: false,
       });
     } finally {
@@ -84,34 +87,38 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
- const signUp = async (email, password, fullName) => {
-  // Verifica se email está na lista de clientes autorizados
-  const { data: autorizado } = await supabase
-    .from('clientes_autorizados')
-    .select('email, usuario_criado')
-    .eq('email', email.trim().toLowerCase())
-    .maybeSingle();
+  const signUp = async (email, password, fullName) => {
+    const emailNorm = email.trim().toLowerCase();
 
-  if (!autorizado) {
-    throw new Error('Este e-mail não está autorizado. Adquira o acesso em nossa página de vendas.');
-  }
+    // Verifica autorização via Edge Function (service role, sem expor a tabela)
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/verificar-acesso`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'apikey':         SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ email: emailNorm }),
+    });
+    const check = await resp.json();
 
-  if (autorizado.usuario_criado) {
-    throw new Error('Este e-mail já possui uma conta. Faça login.');
-  }
+    if (!check.autorizado) {
+      throw new Error('Este e-mail não está autorizado. Adquira o acesso em nossa página de vendas.');
+    }
+    if (check.ja_criado) {
+      throw new Error('Este e-mail já possui uma conta. Faça login.');
+    }
 
-  const { data, error } = await supabase.auth.signUp({
-    email: email.trim(), password,
-    options: { data: { full_name: fullName } },
-  });
-  if (error) throw error;
+    const { data, error } = await supabase.auth.signUp({
+      email: emailNorm, password,
+      options: { data: { full_name: fullName } },
+    });
+    if (error) throw error;
 
-  await supabase.from('clientes_autorizados')
-    .update({ usuario_criado: true })
-    .eq('email', email.trim().toLowerCase());
-
-  return data;
-};
+    // O trigger handle_new_user (SQL 010) marca usuario_criado e
+    // libera o acesso no profile automaticamente. Nada a fazer aqui.
+    return data;
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
