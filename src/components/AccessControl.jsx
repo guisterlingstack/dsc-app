@@ -20,7 +20,7 @@ export default function AccessControl({ children }) {
   if (!user) return null;
 
   // Admin sempre tem acesso
-  if (user.role === 'admin') return children;
+  if (['admin', 'admin_master'].includes(user.role)) return children;
 
   // Verifica produto principal
   if (!user.has_main_mentorship) {
